@@ -61,6 +61,22 @@ function terminZeitLabel(t) {
   if (t.startZeit) return `ab ${t.startZeit} Uhr`;
   return `bis ${t.endZeit} Uhr`;
 }
+// Wie terminZeitLabel, aber für einen einzelnen Umfrage-Terminvorschlag: liefert
+// LEER statt "ganztägig", wenn keine Zeit gesetzt ist -- ein Vorschlag ohne
+// Uhrzeit soll auf der Karte einfach nur das Datum zeigen, nicht "ganztägig".
+function umfrageZeitLabel(c) {
+  if (!c) return "";
+  if (c.startZeit && c.endZeit) return `${c.startZeit}–${c.endZeit} Uhr`;
+  if (c.startZeit) return `ab ${c.startZeit} Uhr`;
+  if (c.endZeit) return `bis ${c.endZeit} Uhr`;
+  return "";
+}
+// Fachlicher Schlüssel eines Vorschlags (Datum + Uhrzeiten). Zwei Vorschläge am
+// selben Tag zu verschiedenen Uhrzeiten sind AUSDRÜCKLICH zwei Vorschläge --
+// dedupliziert wird deshalb über diesen Schlüssel, nicht über das Datum allein.
+function umfrageCandKey(c) { return `${c.datum}|${c.startZeit || ""}|${c.endZeit || ""}`; }
+function umfrageCandSortKey(c) { return `${c.datum}T${c.startZeit || "00:00"}`; }
+
 function wochentagLabel(iso) { return WOCHENTAGE[parseIso(iso).getDay()]; }
 
 // ---------- State ----------
@@ -172,10 +188,11 @@ function umfrageHtml(t) {
       if (user === meinName) meins = v || null;
     });
     const dt = parseIso(c.datum);
+    const zeit = umfrageZeitLabel(c);
     return `
       <div class="umfrage-row" data-cand-id="${escapeHtml(c.id)}">
         <div class="umfrage-row-main">
-          <span class="umfrage-date">${escapeHtml(WOCHENTAGE[dt.getDay()])}, ${escapeHtml(fmtDate(c.datum))}</span>
+          <span class="umfrage-date">${escapeHtml(WOCHENTAGE[dt.getDay()])}, ${escapeHtml(fmtDate(c.datum))}${zeit ? `<span class="umfrage-time">🕘 ${escapeHtml(zeit)}</span>` : ""}</span>
           <div class="umfrage-buttons">
             <button type="button" class="umfrage-vote ja${meins === "ja" ? " active" : ""}" data-termin-id="${escapeHtml(t.id)}" data-cand-id="${escapeHtml(c.id)}" data-val="ja">✓ ${ja}</button>
             <button type="button" class="umfrage-vote nein${meins === "nein" ? " active" : ""}" data-termin-id="${escapeHtml(t.id)}" data-cand-id="${escapeHtml(c.id)}" data-val="nein">✗ ${nein}</button>
@@ -416,22 +433,32 @@ function onShareChipsClick(e) {
 function renderUmfrageEditList() {
   const el = document.getElementById("tf-umfrage-termine");
   if (pendingUmfrageTermine.length === 0) { el.innerHTML = `<span class="muted">Noch keine Terminvorschläge.</span>`; return; }
+  // Uhrzeit gehört zum einzelnen Vorschlag, nicht zum Termin: bei einer Umfrage
+  // liegen die Vorschläge oft zu verschiedenen Zeiten, und das Termin-weite
+  // Zeit-Grid ist in diesem Modus ausgeblendet (siehe updateFormModeUi).
+  // Beide Zeitfelder sind optional -- leer heißt "keine Uhrzeit angegeben".
   el.innerHTML = pendingUmfrageTermine.map((c, i) =>
     `<div class="umfrage-edit-row">` +
-    `<input type="date" class="umfrage-cand-datum" data-idx="${i}" value="${escapeHtml(c.datum || "")}" />` +
+    `<input type="date" class="umfrage-cand-datum" data-idx="${i}" value="${escapeHtml(c.datum || "")}" aria-label="Datum des Terminvorschlags" />` +
+    `<input type="time" class="umfrage-cand-start" data-idx="${i}" value="${escapeHtml(c.startZeit || "")}" aria-label="Startzeit" title="Von (optional)" />` +
+    `<span class="umfrage-cand-sep">–</span>` +
+    `<input type="time" class="umfrage-cand-ende" data-idx="${i}" value="${escapeHtml(c.endZeit || "")}" aria-label="Endzeit" title="Bis (optional)" />` +
     `<button type="button" class="anhang-remove umfrage-cand-remove" data-idx="${i}" aria-label="Entfernen">×</button></div>`
   ).join("");
 }
 
 function addUmfrageTermin() {
-  pendingUmfrageTermine.push({ id: uuid(), datum: "" });
+  pendingUmfrageTermine.push({ id: uuid(), datum: "", startZeit: "", endZeit: "" });
   renderUmfrageEditList();
 }
 
 function onUmfrageListInput(e) {
-  if (!e.target.classList.contains("umfrage-cand-datum")) return;
+  const feld = e.target.classList.contains("umfrage-cand-datum") ? "datum"
+    : e.target.classList.contains("umfrage-cand-start") ? "startZeit"
+    : e.target.classList.contains("umfrage-cand-ende") ? "endZeit" : null;
+  if (!feld) return;
   const idx = parseInt(e.target.dataset.idx, 10);
-  if (pendingUmfrageTermine[idx]) pendingUmfrageTermine[idx].datum = e.target.value;
+  if (pendingUmfrageTermine[idx]) pendingUmfrageTermine[idx][feld] = e.target.value;
 }
 
 function onUmfrageListClick(e) {
@@ -465,7 +492,7 @@ async function openTerminModal(idOrNew) {
   renderAnhangEditList();
 
   pendingUmfrageTermine = (t && terminIsUmfrage(t))
-    ? t.umfrage.termine.map((c) => ({ id: c.id, datum: c.datum }))
+    ? t.umfrage.termine.map((c) => ({ id: c.id, datum: c.datum, startZeit: c.startZeit || "", endZeit: c.endZeit || "" }))
     : [];
   document.getElementById("tf-umfrage").checked = pendingUmfrageTermine.length > 0;
   renderUmfrageEditList();
@@ -532,17 +559,45 @@ async function saveTermin() {
   let datum, endDatum, ganztags, startZeit, endZeit, umfrageCandidates = null;
 
   if (umfrageAktiv) {
-    const rows = Array.from(document.querySelectorAll(".umfrage-cand-datum")).map((el) => el.value);
-    const validDates = [...new Set(rows.filter((d) => ISO_RE.test(d)))].sort();
-    if (validDates.length === 0) { alert("Bitte mindestens einen gültigen Terminvorschlag eintragen."); return; }
-    // Bestehende Ids anhand des Datums wiederverwenden, damit Stimmen bei
-    // unveränderten Vorschlägen erhalten bleiben; neue Vorschläge bekommen neue Ids.
-    umfrageCandidates = validDates.map((d) => {
-      const existing = pendingUmfrageTermine.find((c) => c.datum === d);
-      return { id: existing ? existing.id : uuid(), datum: d };
-    });
-    datum = validDates[0];
-    endDatum = validDates[validDates.length - 1] === datum ? "" : validDates[validDates.length - 1];
+    // Je Formularzeile Datum + optionale Uhrzeiten einsammeln. Die Id kommt über
+    // die Zeilen-Position aus pendingUmfrageTermine, NICHT mehr über das Datum:
+    // sonst verliert ein bestehender Vorschlag, dem man nachträglich eine Uhrzeit
+    // gibt, seine Id -- und mit ihr alle bereits abgegebenen Stimmen.
+    const rows = Array.from(document.querySelectorAll(".umfrage-edit-row")).map((rowEl) => {
+      const datumEl = rowEl.querySelector(".umfrage-cand-datum");
+      const vorhanden = pendingUmfrageTermine[parseInt(datumEl.dataset.idx, 10)];
+      return {
+        id: (vorhanden && vorhanden.id) || uuid(),
+        datum: datumEl.value,
+        startZeit: rowEl.querySelector(".umfrage-cand-start").value || undefined,
+        endZeit: rowEl.querySelector(".umfrage-cand-ende").value || undefined
+      };
+    }).filter((c) => ISO_RE.test(c.datum));
+
+    const gesehen = [];
+    umfrageCandidates = rows
+      .filter((c) => {
+        const k = umfrageCandKey(c);
+        if (gesehen.indexOf(k) !== -1) return false;
+        gesehen.push(k);
+        return true;
+      })
+      .sort((a, b) => umfrageCandSortKey(a).localeCompare(umfrageCandSortKey(b)));
+
+    if (umfrageCandidates.length === 0) { alert("Bitte mindestens einen gültigen Terminvorschlag eintragen."); return; }
+    const falscheSpanne = umfrageCandidates.find((c) => c.startZeit && c.endZeit && c.endZeit <= c.startZeit);
+    if (falscheSpanne) {
+      alert(`Beim Terminvorschlag am ${fmtDate(falscheSpanne.datum)} muss die Endzeit nach der Startzeit liegen.`);
+      return;
+    }
+
+    // datum/endDatum bleiben frühester bzw. spätester Vorschlagstag, damit die
+    // bestehende Sortier- und Vergangenheitslogik unverändert weiterläuft. Die
+    // Uhrzeiten leben ausschließlich in den Vorschlägen; der Termin selbst bleibt
+    // ganztägig.
+    const letztesDatum = umfrageCandidates[umfrageCandidates.length - 1].datum;
+    datum = umfrageCandidates[0].datum;
+    endDatum = letztesDatum === datum ? "" : letztesDatum;
     ganztags = true;
     startZeit = ""; endZeit = "";
   } else {
@@ -586,7 +641,8 @@ async function saveTermin() {
     const before = t ? {
       geteiltUsers: Array.isArray(t.geteiltUsers) ? t.geteiltUsers.slice() : [],
       titel: t.titel, datum: t.datum, endDatum: t.endDatum,
-      ort: t.ort, startZeit: t.startZeit, endZeit: t.endZeit
+      ort: t.ort, startZeit: t.startZeit, endZeit: t.endZeit,
+      umfrage: umfrageSnapshot(t)
     } : null;
     if (!t) { t = { id: uuid() }; appData.termine.push(t); }
     // vorhandene Felder ersetzen (undefined bewusst weglassen)
@@ -634,6 +690,14 @@ async function saveTermin() {
 // aus geteiltUsers oder wenn der Termin gar nicht (mehr) privat ist. Adresse wird
 // serverseitig über den Nutzernamen aufgelöst (Aktion "notify-user", siehe
 // admin-worker.js) -- diese App kennt selbst keine E-Mail-Adressen.
+// Vergleichbare Kurzform aller Terminvorschläge (Datum + Uhrzeiten, in Reihenfolge).
+// Damit zählt auch eine nachträglich geänderte Vorschlagszeit als inhaltliche
+// Änderung -- ohne das käme bei einer reinen Uhrzeit-Korrektur keine Mail heraus,
+// weil t.datum/t.startZeit bei Umfragen unverändert bleiben.
+function umfrageSnapshot(t) {
+  return terminIsUmfrage(t) ? t.umfrage.termine.map(umfrageCandKey).join(";") : "";
+}
+
 async function notifyShareTargets(t, before) {
   if (!t.privat) return;
   const now = Array.isArray(t.geteiltUsers) ? t.geteiltUsers : [];
@@ -644,7 +708,8 @@ async function notifyShareTargets(t, before) {
 
   const inhaltGeaendert = !!before && (
     before.titel !== t.titel || before.datum !== t.datum || before.endDatum !== t.endDatum ||
-    before.ort !== t.ort || before.startZeit !== t.startZeit || before.endZeit !== t.endZeit
+    before.ort !== t.ort || before.startZeit !== t.startZeit || before.endZeit !== t.endZeit ||
+    before.umfrage !== umfrageSnapshot(t)
   );
 
   const von = (currentUser && currentUser.vorname && currentUser.nachname)

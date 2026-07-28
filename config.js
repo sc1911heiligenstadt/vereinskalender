@@ -16,6 +16,20 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.3",
+    groups: [
+      {
+        title: "Uhrzeit bei Umfrage-Terminen",
+        items: [
+          "Jeder Terminvorschlag einer Umfrage kann jetzt eine eigene Uhrzeit haben — „von“ und „bis“ je Vorschlag, beides freiwillig. Ohne Uhrzeit bleibt der Vorschlag wie bisher ein reiner Tagestermin.",
+          "Damit sind auch mehrere Vorschläge am selben Tag zu verschiedenen Zeiten möglich (z. B. 18:00 und 20:00 Uhr) — sie erscheinen als getrennte Zeilen zum Abstimmen.",
+          "Die Uhrzeit steht auf der Terminkarte direkt unter dem jeweiligen Vorschlagsdatum.",
+          "Uhrzeiten lassen sich bei einer laufenden Umfrage nachtragen, ohne dass bereits abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung per E-Mail informiert."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.2",
     groups: [
       {

@@ -203,6 +203,7 @@ body.can-edit .termin-card:hover { background: var(--blue-light); }
 }
 .umfrage-row-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .umfrage-date { font-size: 13px; font-weight: 600; }
+.umfrage-time { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; }
 .umfrage-buttons { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
 .umfrage-vote {
   border: 1px solid var(--border); background: var(--white); border-radius: 6px;
@@ -264,8 +265,13 @@ body.can-edit .termin-card:hover { background: var(--blue-light); }
 
 /* ---------- Umfrage-Terminvorschläge im Formular ---------- */
 .umfrage-edit-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.umfrage-edit-row { display: flex; align-items: center; gap: 10px; }
-.umfrage-edit-row .umfrage-cand-datum { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+.umfrage-edit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.umfrage-edit-row .umfrage-cand-datum { flex: 1 1 140px; min-width: 130px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+/* Uhrzeit je Vorschlag: beide Felder optional, deshalb schmal und ohne eigenes
+   Label -- die Trennung "–" macht die Von/Bis-Spanne auch ohne Beschriftung klar. */
+.umfrage-edit-row .umfrage-cand-start,
+.umfrage-edit-row .umfrage-cand-ende { flex: 0 1 100px; min-width: 90px; padding: 8px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+.umfrage-cand-sep { color: var(--muted); flex: 0 0 auto; }
 
 /* ---------- Teilen mit Nutzern/Gruppen ---------- */
 .share-search-box { position: relative; }
