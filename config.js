@@ -16,99 +16,72 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
-    version: "1.4",
-    groups: [
-      {
-        title: "Bedienung am Handy",
-        items: [
-          "Eingabefelder sind am Handy mindestens 16 Pixel groß. Dadurch zoomt der iPhone-Browser beim Antippen eines Feldes nicht mehr ungefragt in die Seite hinein und bleibt danach verschoben stehen."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.3",
-    groups: [
-      {
-        title: "Uhrzeit bei Umfrage-Terminen",
-        items: [
-          "Jeder Terminvorschlag einer Umfrage kann jetzt eine eigene Uhrzeit haben — „von“ und „bis“ je Vorschlag, beides freiwillig. Ohne Uhrzeit bleibt der Vorschlag wie bisher ein reiner Tagestermin.",
-          "Damit sind auch mehrere Vorschläge am selben Tag zu verschiedenen Zeiten möglich (z. B. 18:00 und 20:00 Uhr) — sie erscheinen als getrennte Zeilen zum Abstimmen.",
-          "Die Uhrzeit steht auf der Terminkarte direkt unter dem jeweiligen Vorschlagsdatum.",
-          "Uhrzeiten lassen sich bei einer laufenden Umfrage nachtragen, ohne dass bereits abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung per E-Mail informiert."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.2",
-    groups: [
-      {
-        title: "Kategorien-Verwaltung",
-        items: [
-          "Die Kategorien (Einstellungen-Tab) pflegt jetzt die Stufe „Administrieren“ (Häkchen im Sichtbarkeits-Panel der Tools-Übersicht) — Bearbeiter legen weiterhin Termine an und ändern sie, die Kategorien-Struktur ändert die Administration."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.1",
-    groups: [
-      {
-        title: "Abstimmen bei Umfrage-Terminen",
-        items: [
-          "Bei einer Umfrage kann jetzt jeder abstimmen, der den Termin sehen darf — vorher meldete der Haken bzw. das Kreuz „Kein Zugriff auf dieses Tool“, sobald jemand ohne Bearbeiten-Recht abstimmen wollte. Genau die eingeladenen Personen kamen damit nicht durch.",
-          "Stimmen anderer werden beim Abstimmen sofort mit übernommen: die Zähler zeigen den aktuellen Stand, auch wenn in der Zwischenzeit jemand anderes abgestimmt hat.",
-          "Ein zweiter Klick auf denselben Knopf zieht die eigene Stimme wieder zurück (wie bisher)."
-        ]
-      }
-    ]
-  },
-  {
     version: "1.0",
     groups: [
       {
         title: "Vereinskalender",
         items: [
-          "Übersicht der als Nächstes anstehenden Vereinstermine — bewusst kein voller Kalender, sondern nur die kommenden Termine auf einen Blick, chronologisch sortiert.",
-          "Der nächste Termin wird oben als Karte hervorgehoben, danach folgen die weiteren Termine nach Monat gruppiert.",
-          "Vergangene Termine verschwinden automatisch aus der Ansicht — inklusive der zu ihnen hochgeladenen Dateien.",
-          "Jede Terminkarte zeigt, von wem und wann der Termin angelegt wurde (sofern bekannt)."
+          "Übersicht der als Nächstes anstehenden Vereinstermine — bewusst kein voller Kalender, sondern die kommenden Termine auf einen Blick, chronologisch sortiert.",
+          "Der nächste Termin steht oben als hervorgehobene Karte, danach folgen die weiteren nach Monat gruppiert.",
+          "Vergangene Termine verschwinden von selbst aus der Ansicht, samt der zu ihnen hochgeladenen Dateien.",
+          "Jede Karte zeigt, von wem und wann der Termin angelegt wurde."
         ]
       },
       {
-        title: "Privattermine & Teilen",
+        title: "Termine eintragen",
         items: [
-          "Termine können als „Privattermin“ markiert werden — diese sieht nur die Person, die sie angelegt hat.",
-          "Private Termine lassen sich gezielt mit einzelnen Nutzern (Suchfeld) oder ganzen Gruppen teilen, die den Termin dann zusätzlich sehen.",
-          "Personen, mit denen ein privater Termin geteilt wird, bekommen zusätzlich eine kurze E-Mail-Benachrichtigung (beim erstmaligen Teilen und bei späteren Änderungen des Termins)."
+          "Titel, Kategorie, Datum — auch mehrtägig —, wahlweise Uhrzeit oder ganztägig, Ort und Notiz.",
+          "Zu jedem Termin lassen sich Dateien anhängen: PDF, Bilder oder andere Formate. Alle angemeldeten Nutzer können sie öffnen oder herunterladen."
+        ]
+      },
+      {
+        title: "Privattermine und Teilen",
+        items: [
+          "Ein Termin lässt sich als Privattermin markieren — dann sieht ihn nur, wer ihn angelegt hat.",
+          "Private Termine lassen sich gezielt mit einzelnen Personen über ein Suchfeld oder mit ganzen Gruppen teilen. Diese sehen den Termin dann zusätzlich.",
+          "Wer einen privaten Termin geteilt bekommt, erhält eine kurze E-Mail — beim ersten Teilen und bei späteren Änderungen."
         ]
       },
       {
         title: "Umfrage-Termine",
         items: [
-          "Option „Umfrage“: statt eines einzelnen Datums mehrere Terminvorschläge eintragen, über die abgestimmt werden kann.",
-          "Abstimmen geht direkt auf der Terminkarte per Haken/Kreuz-Button je Vorschlag, ganz ohne das Termin-Formular zu öffnen; ein 👥-Button zeigt die Namen der Zu- und Absagen je Vorschlag."
+          "Statt eines festen Datums lassen sich mehrere Terminvorschläge eintragen, über die abgestimmt wird.",
+          "Jeder Vorschlag kann eine eigene Uhrzeit haben, „von“ und „bis“, beides freiwillig. Ohne Uhrzeit bleibt er ein Tagestermin.",
+          "Dadurch sind auch mehrere Vorschläge am selben Tag zu verschiedenen Zeiten möglich — sie erscheinen als getrennte Zeilen zum Abstimmen.",
+          "Abgestimmt wird direkt auf der Terminkarte per Haken oder Kreuz, ohne das Formular zu öffnen. Ein weiterer Knopf zeigt die Namen der Zu- und Absagen je Vorschlag.",
+          "Abstimmen darf jeder, der den Termin sehen darf — also genau die eingeladenen Personen, auch ohne Bearbeiten-Recht.",
+          "Die Stimmen anderer werden beim eigenen Abstimmen sofort mit übernommen; die Zähler zeigen den aktuellen Stand.",
+          "Ein zweiter Klick auf denselben Knopf zieht die eigene Stimme zurück.",
+          "Uhrzeiten lassen sich bei laufender Umfrage nachtragen, ohne dass abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung informiert."
         ]
       },
       {
-        title: "Kategorien-Verwaltung",
+        title: "Kategorien",
         items: [
-          "Eigener Einstellungen-Tab (nur für Bearbeiter sichtbar): Kategorien für Termine anlegen, umbenennen, umfärben und löschen — sie stehen danach direkt im Termin-Formular als Auswahl zur Verfügung."
+          "Kategorien für Termine anlegen, umbenennen, umfärben und löschen. Sie stehen danach im Termin-Formular zur Auswahl."
         ]
       },
       {
-        title: "Eintragen (Admin & berechtigte Gruppen)",
+        title: "Wer darf was",
         items: [
-          "Termine anlegen, ändern und löschen: Titel, Kategorie, Datum (auch mehrtägig), optionale Uhrzeit oder ganztägig, Ort/Platz und Notiz.",
-          "Zu jedem Termin lassen sich Dateien anhängen (PDF, Bilder oder andere Formate); alle eingeloggten Nutzer können sie zum Ansehen in einem neuen Tab öffnen oder herunterladen.",
-          "Bearbeiten-Recht wird über die Gruppenverwaltung der Tools-Übersicht vergeben; alle übrigen eingeloggten Nutzer sehen die Termine nur an."
+          "Sehen: alle Termine, Anhänge öffnen und bei Umfragen abstimmen.",
+          "Bearbeiten: Termine anlegen, ändern und löschen, Dateien anhängen, Termine teilen.",
+          "Administrieren: die Kategorien im Reiter „Einstellungen“ pflegen.",
+          "Der Reiter „Info“ ist für alle sichtbar."
+        ]
+      },
+      {
+        title: "Bedienung am Handy",
+        items: [
+          "Die Ansicht ist für das Handy gebaut und funktioniert dort vollständig.",
+          "Eingabefelder sind mindestens 16 Pixel groß, damit der iPhone-Browser beim Antippen nicht ungefragt in die Seite hineinzoomt und verschoben stehen bleibt."
         ]
       },
       {
         title: "Daten & Speicherung",
         items: [
-          "Automatische Nextcloud-Synchronisierung über die zentrale Anmeldung (Tools-Übersicht) — kein separates Passwort nötig; gleichzeitige Änderungen von zwei Geräten werden erkannt und gemeldet."
+          "Gespeichert wird in der Vereins-Nextcloud über die zentrale Anmeldung der Tools-Übersicht — ein eigenes Passwort braucht es nicht.",
+          "Ändern zwei Geräte gleichzeitig denselben Stand, erkennt die App das, lädt den fremden Stand nach und sagt Bescheid."
         ]
       }
     ]
