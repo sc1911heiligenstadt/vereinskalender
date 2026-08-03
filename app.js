@@ -673,6 +673,7 @@ async function saveTermin() {
     // Best-effort, NACH erfolgreichem Speichern -- ein Mail-Fehler darf den schon
     // gespeicherten Termin nie als "nicht gespeichert" erscheinen lassen.
     try { await notifyShareTargets(t, before); } catch (e) { console.warn("Teilen-Benachrichtigung fehlgeschlagen", e); }
+    try { await pushOeffentlichenTermin(t, before); } catch (e) { console.warn("Termin-Benachrichtigung fehlgeschlagen", e); }
     renderAll();
     closeTerminModal();
   } catch (e) {
@@ -698,6 +699,19 @@ function umfrageSnapshot(t) {
   return terminIsUmfrage(t) ? t.umfrage.termine.map(umfrageCandKey).join(";") : "";
 }
 
+// Gemeinsam genutzt von notifyShareTargets (private Termine, Mail+Push an die
+// Geteilten) und pushOeffentlichenTermin (alle uebrigen, Push an alle) --
+// bewusst EINE Funktion: zwei Kopien derselben Vergleichsliste laufen
+// auseinander, sobald ein Feld dazukommt, und dann meldet sich der eine Weg bei
+// einer Aenderung und der andere nicht.
+function terminInhaltGeaendert(t, before) {
+  return !!before && (
+    before.titel !== t.titel || before.datum !== t.datum || before.endDatum !== t.endDatum ||
+    before.ort !== t.ort || before.startZeit !== t.startZeit || before.endZeit !== t.endZeit ||
+    before.umfrage !== umfrageSnapshot(t)
+  );
+}
+
 async function notifyShareTargets(t, before) {
   if (!t.privat) return;
   const now = Array.isArray(t.geteiltUsers) ? t.geteiltUsers : [];
@@ -706,11 +720,7 @@ async function notifyShareTargets(t, before) {
   const bestehend = now.filter((u) => prev.includes(u));
   if (!neu.length && !bestehend.length) return;
 
-  const inhaltGeaendert = !!before && (
-    before.titel !== t.titel || before.datum !== t.datum || before.endDatum !== t.endDatum ||
-    before.ort !== t.ort || before.startZeit !== t.startZeit || before.endZeit !== t.endZeit ||
-    before.umfrage !== umfrageSnapshot(t)
-  );
+  const inhaltGeaendert = terminInhaltGeaendert(t, before);
 
   const von = (currentUser && currentUser.vorname && currentUser.nachname)
     ? `${currentUser.vorname} ${currentUser.nachname}` : "Jemand";
@@ -733,6 +743,37 @@ async function notifyShareTargets(t, before) {
       await sende(u, "Privater Termin geändert: " + t.titel,
         `${von} hat einen mit dir geteilten privaten Termin geändert: "${t.titel}". Bitte im Vereinskalender ansehen: ${link}`);
     }
+  }
+}
+
+// ---------- Nicht-private Termine: Push an alle (seit 2026-08-03) ----------
+// Michel-Vorgabe: "nicht nur Private, sondern wirklich jeder Termin". Der
+// Empfaengerkreis wird SERVERSEITIG bestimmt (alle Personalkonten ausser dem
+// Ausloeser, keine Spielerkonten) -- diese App kennt den Nutzerbestand gar
+// nicht, und 200 Einzelaufrufe wie beim Mail-Weg waeren hier absurd.
+//
+// ⚠️ Nur fuer NICHT-private Termine. Private laufen weiter ueber
+// notifyShareTargets: dort gibt es Mail und Push, aber ausschliesslich an die
+// tatsaechlich Geteilten. Ohne diese Trennung bekaeme ein privater Termin
+// beides doppelt -- und zusaetzlich Leute, die ihn nicht sehen duerfen.
+//
+// ⚠️ Es geht KEINE Mail mit. Ein oeffentlicher Termin an die ganze Belegschaft
+// waere ein Rundschreiben, und dafuer ist der Kalender nicht da.
+async function pushOeffentlichenTermin(t, before) {
+  if (t.privat) return;
+  // Beim Bearbeiten nur melden, wenn sich sichtbar etwas geaendert hat. Wer
+  // eine Notiz korrigiert oder einen Anhang tauscht, loest nichts aus.
+  if (before && !terminInhaltGeaendert(t, before)) return;
+  try {
+    await gatewayRequest({
+      action: "vereinskalender-termin-push",
+      art: before ? "geaendert" : "neu"
+    });
+  } catch (e) {
+    // Best-effort wie beim Mail-Weg: der Termin ist zu diesem Zeitpunkt
+    // gespeichert, eine misslungene Benachrichtigung darf ihn nicht als
+    // "nicht gespeichert" erscheinen lassen.
+    console.warn("Termin-Benachrichtigung fehlgeschlagen", e);
   }
 }
 

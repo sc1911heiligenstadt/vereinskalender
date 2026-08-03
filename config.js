@@ -16,6 +16,23 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.1",
+    groups: [
+      {
+        title: "Benachrichtigung aufs Handy",
+        items: [
+          "Wird ein Termin angelegt oder inhaltlich geändert, bekommt das Personal eine Benachrichtigung aufs Handy — vorausgesetzt, es hat sie in der Tools-Übersicht unter „Mein Konto“ eingeschaltet. Bisher gab es nur bei privat geteilten Terminen eine E-Mail.",
+          "Gemeldet werden Änderungen an Titel, Datum, Ort, Uhrzeit oder den Terminvorschlägen einer Umfrage. Eine korrigierte Notiz oder ein ausgetauschter Anhang lösen bewusst nichts aus.",
+          "Wer den Termin selbst anlegt, bekommt keine Meldung darüber.",
+          "Die Nachricht nennt weder Titel noch Ort — sie steht auf dem Sperrbildschirm. Was ansteht, sieht man nach dem Antippen im Kalender.",
+          "Spielerkonten werden nicht benachrichtigt.",
+          "Privat geteilte Termine laufen unverändert weiter wie bisher: E-Mail und Benachrichtigung gehen dort nur an die Personen, mit denen der Termin geteilt wurde.",
+          "Es geht keine E-Mail an alle — ein öffentlicher Termin ist kein Rundschreiben."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.0",
     groups: [
       {
