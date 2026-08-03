@@ -1,7 +1,7 @@
 # Vereinskalender (v1.0)
 
 Übersicht der als Nächstes anstehenden Vereinstermine des 1. SC 1911 Heiligenstadt —
-Teil der [Tools-Übersicht](https://tecko1985.github.io/ToolsUebersicht/).
+Teil der [Tools-Übersicht](https://sc1911heiligenstadt.github.io/ToolsUebersicht/).
 
 Bewusst **kein voller Kalender**, sondern nur die kommenden Termine auf einen Blick: gesperrte
 Hallen/Plätze, Trainingszeiten, Veranstaltungen. Der nächste Termin steht oben als Karte, danach

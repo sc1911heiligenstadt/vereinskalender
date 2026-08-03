@@ -714,7 +714,7 @@ async function notifyShareTargets(t, before) {
 
   const von = (currentUser && currentUser.vorname && currentUser.nachname)
     ? `${currentUser.vorname} ${currentUser.nachname}` : "Jemand";
-  const link = "https://tecko1985.github.io/vereinskalender/";
+  const link = "https://sc1911heiligenstadt.github.io/vereinskalender/";
 
   const sende = async (username, subject, message) => {
     try {
