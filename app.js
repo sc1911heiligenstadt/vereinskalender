@@ -345,10 +345,137 @@ function renderAll() {
   renderKategorien();
 }
 
+// ---------- Abo-Link für den eigenen Kalender ----------
+// Ein Kalenderprogramm kann sich nicht anmelden — es kennt nur eine Adresse.
+// Deshalb ist die URL selbst der Ausweis, und deshalb hängt an ihr auch ein
+// Entwerten-Knopf: ein Link, den man nicht loswird, wäre hier das eigentliche
+// Problem.
+let aboState = null;   // {aktiv, umfang, url, webcalUrl} | null solange nicht geladen
+let aboLaeuft = false; // verhindert Doppelklicks auf die Knöpfe
+
+function setAboStatus(text, art) {
+  const el = document.getElementById("abo-status");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "abo-status" + (art ? " " + art : "");
+}
+
+function renderAbo() {
+  const karte = document.getElementById("abo-karte");
+  if (!karte || !aboState) return;
+  const aktiv = !!aboState.aktiv;
+  document.getElementById("abo-aus").classList.toggle("hidden", aktiv);
+  document.getElementById("abo-an").classList.toggle("hidden", !aktiv);
+  if (!aktiv) {
+    // Ausblenden genügt nicht: ein entwerteter Link bliebe sonst im Feld stehen
+    // und ließe sich weiter herauskopieren — ein toter Wert, der wie ein gültiger
+    // aussieht.
+    document.getElementById("abo-link").value = "";
+    document.getElementById("btn-abo-oeffnen").removeAttribute("href");
+    return;
+  }
+
+  document.getElementById("abo-link").value = aboState.url || "";
+  const oeffnen = document.getElementById("btn-abo-oeffnen");
+  // webcal:// öffnet die Kalender-App direkt. Fehlt es (alter Worker), bleibt der
+  // https-Link — der lädt dann eine Datei herunter, was immer noch weiterhilft.
+  oeffnen.href = aboState.webcalUrl || aboState.url || "#";
+  const alle = aboState.umfang === "alle";
+  document.getElementById("abo-umfang-zeile").textContent = alle
+    ? "Enthält alle Termine, die du auch in der App siehst — einschließlich deiner privaten und der mit dir geteilten."
+    : "Enthält die allgemeinen Vereinstermine. Private Termine sind nicht dabei.";
+  document.getElementById("abo-umfang-alle").checked = alle;
+}
+
+async function ladeAboStatus() {
+  if (aboState) return; // einmal je Sitzung reicht — der Stand ändert sich nur hier
+  try {
+    const res = await gatewayAboStatus();
+    aboState = res && typeof res === "object" ? res : { aktiv: false };
+    renderAbo();
+  } catch (e) {
+    // Kennt der Worker die Aktion noch nicht, verschwindet die ganze Karte, statt
+    // einen roten Hinweis für etwas zu zeigen, das es serverseitig noch nicht gibt
+    // (gleiche Linie wie push-status in der Tools-Übersicht). Pages ist sofort
+    // live, der Worker braucht einen eigenen Deploy.
+    const karte = document.getElementById("abo-karte");
+    if (karte) karte.classList.add("hidden");
+    console.warn("Kalender-Abo nicht verfügbar", e);
+  }
+}
+
+async function aboAnlegen() {
+  if (aboLaeuft) return;
+  aboLaeuft = true;
+  setAboStatus("Link wird erzeugt…", "");
+  try {
+    const umfang = document.getElementById("abo-umfang-alle").checked ? "alle" : "oeffentlich";
+    aboState = await gatewayAboAnlegen(umfang);
+    renderAbo();
+    setAboStatus("Dein Kalender-Link ist bereit.", "ok");
+  } catch (e) {
+    setAboStatus("Der Link konnte nicht erzeugt werden: " + e.message, "fehler");
+  } finally {
+    aboLaeuft = false;
+  }
+}
+
+async function aboNeuErzeugen() {
+  // Bewusst mit Rückfrage: der bisherige Link hört dabei auf zu funktionieren,
+  // und in fremden Kalendern steht er dann als toter Eintrag.
+  if (!confirm("Einen neuen Link erzeugen? Der bisherige hört sofort auf zu funktionieren — " +
+               "in deinem Kalender musst du das Abo danach neu eintragen.")) return;
+  await aboAnlegen();
+}
+
+async function aboLoeschen() {
+  if (aboLaeuft) return;
+  if (!confirm("Den Link entwerten? Die Vereinstermine verschwinden danach aus deinem Kalender.")) return;
+  aboLaeuft = true;
+  setAboStatus("Link wird entwertet…", "");
+  try {
+    await gatewayAboLoeschen();
+    aboState = { aktiv: false };
+    renderAbo();
+    setAboStatus("Der Link ist entwertet. Du kannst dir jederzeit einen neuen erzeugen.", "ok");
+  } catch (e) {
+    setAboStatus("Der Link konnte nicht entwertet werden: " + e.message, "fehler");
+  } finally {
+    aboLaeuft = false;
+  }
+}
+
+async function aboKopieren() {
+  const feld = document.getElementById("abo-link");
+  if (!feld || !feld.value) return;
+  try {
+    // navigator.clipboard gibt es auf den älteren iOS-Geräten der Flotte nicht
+    // überall — der select/execCommand-Weg ist der Rückfallweg, nicht umgekehrt.
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(feld.value);
+    } else {
+      feld.removeAttribute("readonly");
+      feld.select();
+      feld.setSelectionRange(0, feld.value.length);
+      document.execCommand("copy");
+      feld.setAttribute("readonly", "readonly");
+    }
+    setAboStatus("Link kopiert.", "ok");
+  } catch (_) {
+    // Kein stiller Fehlschlag: sonst glaubt man, der Link sei in der Zwischenablage.
+    feld.select();
+    setAboStatus("Kopieren hat nicht geklappt — der Link ist markiert, bitte von Hand kopieren.", "fehler");
+  }
+}
+
 // ---------- Tabs ----------
 function switchTab(tab) {
   document.querySelectorAll("nav button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".tab-section").forEach((s) => s.classList.toggle("active", s.id === "tab-" + tab));
+  // Erst beim Öffnen des Tabs laden, nicht beim Seitenaufbau: sonst kostet jeder
+  // Aufruf der App einen zusätzlichen Worker-Rundlauf für eine Karte, die die
+  // meisten nie ansehen.
+  if (tab === "info") ladeAboStatus();
 }
 
 // ---------- Datei-Anhänge im Formular ----------
@@ -1065,6 +1192,12 @@ function setupListeners() {
   document.querySelectorAll("nav button[data-tab]").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
 
   document.getElementById("btn-new-termin").addEventListener("click", () => openTerminModal(null));
+
+  // Abo-Link im Info-Tab
+  document.getElementById("btn-abo-anlegen").addEventListener("click", aboAnlegen);
+  document.getElementById("btn-abo-neu").addEventListener("click", aboNeuErzeugen);
+  document.getElementById("btn-abo-loeschen").addEventListener("click", aboLoeschen);
+  document.getElementById("btn-abo-kopieren").addEventListener("click", aboKopieren);
 
   // Termin-Karte antippen -> bearbeiten (nur Bearbeiter).
   document.getElementById("hero").addEventListener("click", onCardClick);

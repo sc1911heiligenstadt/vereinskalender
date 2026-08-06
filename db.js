@@ -139,6 +139,22 @@ async function gatewayVote(terminId, candId, wert) {
   return (body.stimmen && typeof body.stimmen === "object") ? body.stimmen : null;
 }
 
+// ---------- Abo-Link für den eigenen Kalender ----------
+// Der Feed selbst läuft NICHT über diese Funktionen, sondern wird vom
+// Kalenderprogramm direkt unter der zurückgelieferten URL abgerufen — dort gibt es
+// keinen Token im Header, deshalb steckt der Ausweis in der Adresse.
+// umfang: "oeffentlich" (nur allgemeine Vereinstermine) | "alle" (zusätzlich
+// eigene und mit einem geteilte Privattermine).
+async function gatewayAboStatus() {
+  return gatewayRequest({ action: "vereinskalender-abo-status" });
+}
+async function gatewayAboAnlegen(umfang) {
+  return gatewayRequest({ action: "vereinskalender-abo-anlegen", umfang });
+}
+async function gatewayAboLoeschen() {
+  return gatewayRequest({ action: "vereinskalender-abo-loeschen" });
+}
+
 // Liefert {users:[{username,displayName}], groups:[{id,name}]} für den
 // "Teilen mit"-Picker bei privaten Terminen/Umfragen — für jeden eingeloggten
 // Nutzer abrufbar, keine sensiblen Felder.
