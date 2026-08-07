@@ -16,6 +16,19 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.2",
+    groups: [
+      {
+        title: "Vergangene Terminvorschläge verschwinden",
+        items: [
+          "Bei einer Umfrage werden nur noch die Terminvorschläge angezeigt, die noch bevorstehen. Ein Vorschlagstag, der vorbei ist, verschwindet am Folgetag von der Karte — auch wenn weitere Vorschläge desselben Termins noch kommen.",
+          "Der Termin rutscht dadurch an die richtige Stelle: Datum und Einordnung in der Liste richten sich nach dem nächsten noch offenen Vorschlag, nicht mehr nach dem ersten überhaupt.",
+          "Die Übersicht zeigt damit dasselbe wie das Fenster „Nächste Termine“ auf der Startseite."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.1",
     groups: [
       {

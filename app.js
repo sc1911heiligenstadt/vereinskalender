@@ -40,7 +40,15 @@ function terminEndIso(t) {
 function isPast(t) { return terminEndIso(t) < todayIso(); }
 function isUpcoming(t) { return ISO_RE.test(t.datum || "") && !isPast(t); }
 
-function sortKey(t) { return `${t.datum}T${(t.ganztags ? "" : t.startZeit) || "00:00"}`; }
+// Sortiert wird nach dem ANZEIGE-Start (siehe terminAnzeigeStartIso): bei einer
+// Umfrage ist das der früheste noch kommende Vorschlag, nicht t.datum -- sonst
+// bliebe ein Termin, dessen erster Vorschlagstag vorbei ist, ganz oben als
+// "Nächster Termin" stehen, obwohl dieser Tag gar nicht mehr angezeigt wird.
+function sortKey(t) {
+  const c = umfrageErsterSichtbarer(t);
+  if (c) return umfrageCandSortKey(c);
+  return `${t.datum}T${(t.ganztags ? "" : t.startZeit) || "00:00"}`;
+}
 function sortTermine(a, b) { return sortKey(a).localeCompare(sortKey(b)); }
 
 function monthKey(iso) { return iso.slice(0, 7); }
@@ -76,6 +84,34 @@ function umfrageZeitLabel(c) {
 // dedupliziert wird deshalb über diesen Schlüssel, nicht über das Datum allein.
 function umfrageCandKey(c) { return `${c.datum}|${c.startZeit || ""}|${c.endZeit || ""}`; }
 function umfrageCandSortKey(c) { return `${c.datum}T${c.startZeit || "00:00"}`; }
+
+// Terminvorschläge einer Umfrage OHNE die bereits vergangenen Tage. Ein Termin
+// mit mehreren Vorschlägen bleibt sichtbar, solange irgendein Vorschlag noch
+// kommt (t.endDatum = spätester Vorschlag), aber die einzelnen abgelaufenen
+// Vorschlagstage gehören dann nicht mehr auf die Karte -- die Übersicht ist eine
+// Vorschau, kein Rückblick. Gefiltert wird nur beim Anzeigen: die Stimmen zu
+// einem abgelaufenen Vorschlag bleiben in den Daten stehen, damit das
+// nachträgliche Ergänzen einer Uhrzeit sie nicht mitreißt.
+function umfrageSichtbareTermine(t) {
+  if (!terminIsUmfrage(t)) return [];
+  const heute = todayIso();
+  return t.umfrage.termine.filter((c) => c && ISO_RE.test(c.datum || "") && c.datum >= heute);
+}
+// Der früheste noch kommende Vorschlag -- null, wenn es keine Umfrage ist oder
+// (bei krummen Daten) kein Vorschlag mehr in der Zukunft liegt.
+function umfrageErsterSichtbarer(t) {
+  const cands = umfrageSichtbareTermine(t);
+  if (!cands.length) return null;
+  return cands.reduce((a, c) => (umfrageCandSortKey(c) < umfrageCandSortKey(a) ? c : a), cands[0]);
+}
+// Datum, unter dem der Termin in der Liste erscheint: bei einer Umfrage der
+// früheste noch kommende Vorschlag, sonst schlicht t.datum. t.datum selbst bleibt
+// bei Umfragen bewusst der früheste Vorschlag ÜBERHAUPT (Sortier- und
+// Vergangenheitslogik hängen daran, siehe CLAUDE.md).
+function terminAnzeigeStartIso(t) {
+  const c = umfrageErsterSichtbarer(t);
+  return c ? c.datum : t.datum;
+}
 
 function wochentagLabel(iso) { return WOCHENTAGE[parseIso(iso).getDay()]; }
 
@@ -180,7 +216,9 @@ function anhaengeHtml(t) {
 function umfrageHtml(t) {
   const stimmen = (t.umfrage && t.umfrage.stimmen) || {};
   const meinName = currentUser ? currentUser.username : null;
-  const rows = t.umfrage.termine.map((c) => {
+  const sichtbar = umfrageSichtbareTermine(t);
+  if (!sichtbar.length) return "";
+  const rows = sichtbar.map((c) => {
     let ja = 0, nein = 0, meins = null;
     Object.entries(stimmen).forEach(([user, votes]) => {
       const v = votes ? votes[c.id] : null;
@@ -249,7 +287,7 @@ function erstelltLabel(t) {
 }
 
 function terminCardHtml(t, isHero) {
-  const start = t.datum;
+  const start = terminAnzeigeStartIso(t);
   const end = terminEndIso(t);
   const dt = parseIso(start);
   const dayBadge = `<span class="tc-day">${dt.getDate()}</span><span class="tc-mon">${MONATE_KURZ[dt.getMonth()]}</span>` +
@@ -314,9 +352,10 @@ function renderTermine() {
   let html = "";
   let lastMonth = null;
   rest.forEach((t) => {
-    const mk = monthKey(t.datum);
+    const anzeigeStart = terminAnzeigeStartIso(t);
+    const mk = monthKey(anzeigeStart);
     if (mk !== lastMonth) {
-      html += `<div class="month-heading">${escapeHtml(monthLabel(t.datum))}</div>`;
+      html += `<div class="month-heading">${escapeHtml(monthLabel(anzeigeStart))}</div>`;
       lastMonth = mk;
     }
     html += terminCardHtml(t, false);
