@@ -16,37 +16,6 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
-    version: "1.2",
-    groups: [
-      {
-        title: "Vergangene Terminvorschläge verschwinden",
-        items: [
-          "Bei einer Umfrage werden nur noch die Terminvorschläge angezeigt, die noch bevorstehen. Ein Vorschlagstag, der vorbei ist, verschwindet am Folgetag von der Karte — auch wenn weitere Vorschläge desselben Termins noch kommen.",
-          "Der Termin rutscht dadurch an die richtige Stelle: Datum und Einordnung in der Liste richten sich nach dem nächsten noch offenen Vorschlag, nicht mehr nach dem ersten überhaupt.",
-          "Die Übersicht zeigt damit dasselbe wie das Fenster „Nächste Termine“ auf der Startseite."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.1",
-    groups: [
-      {
-        title: "In den eigenen Kalender übernehmen",
-        items: [
-          "Im Reiter „Info“ lässt sich ein persönlicher Kalender-Link erzeugen. Damit erscheinen die Vereinstermine dauerhaft im eigenen Kalender — am Handy, im Google-Konto oder in Outlook.",
-          "Das ist keine einmalige Kopie: der eigene Kalender ruft den Link von selbst regelmäßig ab, neue und geänderte Termine kommen also von allein dazu.",
-          "Beim Erzeugen ist wählbar, ob nur die allgemeinen Vereinstermine übernommen werden oder zusätzlich die eigenen privaten und die mit einem geteilten. Ohne Haken bleiben private Termine außen vor.",
-          "Umfrage-Termine erscheinen mit jedem Vorschlag als eigener Eintrag und sind als unbestätigt gekennzeichnet.",
-          "Den Link darf sich jeder erzeugen, der den Kalender sehen darf — er zeigt genau die Termine, die man auch in der App sieht.",
-          "Der Link ist der Ausweis: wer ihn hat, sieht die Termine. Er lässt sich jederzeit entwerten und neu erzeugen.",
-          "Wird das Konto gelöscht oder der Zugang zum Vereinskalender entzogen, hört der Link im selben Moment auf zu funktionieren.",
-          "Wie schnell Änderungen ankommen, bestimmt das eigene Kalenderprogramm. Apple und Outlook fragen im Minutenabstand nach, Google nur alle paar Stunden."
-        ]
-      }
-    ]
-  },
-  {
     version: "1.0",
     groups: [
       {
@@ -83,7 +52,22 @@ const APP_CHANGELOG = [
           "Abstimmen darf jeder, der den Termin sehen darf — also genau die eingeladenen Personen, auch ohne Bearbeiten-Recht.",
           "Die Stimmen anderer werden beim eigenen Abstimmen sofort mit übernommen; die Zähler zeigen den aktuellen Stand.",
           "Ein zweiter Klick auf denselben Knopf zieht die eigene Stimme zurück.",
-          "Uhrzeiten lassen sich bei laufender Umfrage nachtragen, ohne dass abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung informiert."
+          "Uhrzeiten lassen sich bei laufender Umfrage nachtragen, ohne dass abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung informiert.",
+          "Angezeigt werden nur die Terminvorschläge, die noch bevorstehen. Ein Vorschlagstag, der vorbei ist, verschwindet am Folgetag von der Karte — auch wenn weitere Vorschläge desselben Termins noch kommen.",
+          "Datum und Einordnung in der Liste richten sich nach dem nächsten noch offenen Vorschlag, nicht nach dem ersten überhaupt. Die Übersicht zeigt damit dasselbe wie das Fenster „Nächste Termine“ auf der Startseite."
+        ]
+      },
+      {
+        title: "In den eigenen Kalender übernehmen",
+        items: [
+          "Im Reiter „Info“ lässt sich ein persönlicher Kalender-Link erzeugen. Damit erscheinen die Vereinstermine dauerhaft im eigenen Kalender — am Handy, im Google-Konto oder in Outlook.",
+          "Das ist keine einmalige Kopie: der eigene Kalender ruft den Link von selbst regelmäßig ab, neue und geänderte Termine kommen also von allein dazu.",
+          "Beim Erzeugen ist wählbar, ob nur die allgemeinen Vereinstermine übernommen werden oder zusätzlich die eigenen privaten und die mit einem geteilten. Ohne Haken bleiben private Termine außen vor.",
+          "Umfrage-Termine erscheinen mit jedem Vorschlag als eigener Eintrag und sind als unbestätigt gekennzeichnet.",
+          "Den Link darf sich jeder erzeugen, der den Kalender sehen darf — er zeigt genau die Termine, die man auch in der App sieht.",
+          "Der Link ist der Ausweis: wer ihn hat, sieht die Termine. Er lässt sich jederzeit entwerten und neu erzeugen.",
+          "Wird das Konto gelöscht oder der Zugang zum Vereinskalender entzogen, hört der Link im selben Moment auf zu funktionieren.",
+          "Wie schnell Änderungen ankommen, bestimmt das eigene Kalenderprogramm. Apple und Outlook fragen im Minutenabstand nach, Google nur alle paar Stunden."
         ]
       },
       {
