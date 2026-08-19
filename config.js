@@ -16,6 +16,20 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.1",
+    groups: [
+      {
+        title: "Ausführlichere E-Mails beim Teilen",
+        items: [
+          "Die E-Mail an die Personen, mit denen ein privater Termin geteilt wird, nennt jetzt Titel, Tag, Uhrzeit und Ort direkt in der Nachricht — vorher stand dort nur ein Satz mit dem Titel und ein Link.",
+          "Bei einer Terminumfrage listet die E-Mail alle zur Auswahl stehenden Tage samt Uhrzeiten auf und bittet um die Abstimmung.",
+          "Wird ein bereits geteilter Termin geändert, steht der neue Stand mit allen Eckdaten in der E-Mail, nicht nur der Hinweis, dass sich etwas geändert hat.",
+          "Die Notiz zum Termin bleibt bewusst draußen: Titel, Tag und Ort reichen zum Einordnen, alle Einzelheiten stehen weiterhin nur in der App."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.0",
     groups: [
       {
@@ -39,7 +53,7 @@ const APP_CHANGELOG = [
         items: [
           "Ein Termin lässt sich als Privattermin markieren — dann sieht ihn nur, wer ihn angelegt hat.",
           "Private Termine lassen sich gezielt mit einzelnen Personen über ein Suchfeld oder mit ganzen Gruppen teilen. Diese sehen den Termin dann zusätzlich.",
-          "Wer einen privaten Termin geteilt bekommt, erhält eine kurze E-Mail — beim ersten Teilen und bei späteren Änderungen."
+          "Wer einen privaten Termin geteilt bekommt, erhält eine E-Mail — beim ersten Teilen und bei späteren Änderungen."
         ]
       },
       {

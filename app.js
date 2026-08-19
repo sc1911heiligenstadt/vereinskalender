@@ -900,14 +900,52 @@ async function notifyShareTargets(t, before) {
     }
   };
 
+  // Eckdaten des Termins fuer den Mailtext. Seit 2026-08-19 (Michel-Wunsch:
+  // ausfuehrlicher) steht hier eine richtige Mail statt eines Einzeilers -- wer
+  // sie liest, weiss ohne die App zu oeffnen, worum es geht und wann es ist.
+  //
+  // ⚠️ Die NOTIZ bleibt bewusst draussen. Titel, Tag und Ort braucht man, um den
+  // Termin einordnen zu koennen; die Notiz ist der Ort fuer Einzelheiten und hat
+  // in einem Postfach nichts verloren, das der Verein nicht kontrolliert. Fuer
+  // den Push gilt dieselbe Linie eine Stufe schaerfer (dort fehlt auch der Titel).
+  const eckdaten = () => {
+    const z = [];
+    if (terminIsUmfrage(t)) {
+      z.push("", "Ein fester Tag steht noch nicht fest. Zur Auswahl stehen:", "");
+      for (const c of t.umfrage.termine) {
+        const zeit = umfrageZeitLabel(c);
+        z.push("  • " + fmtDate(c.datum) + (zeit ? ", " + zeit : ""));
+      }
+      z.push("", "Bitte stimme im Vereinskalender ab, wann es dir passt — direkt auf der",
+        "Terminkarte, das dauert einen Klick.");
+    } else {
+      z.push("Wann:    " + terminDatumLabel(t) + ", " + terminZeitLabel(t));
+      if (t.ort) z.push("Wo:      " + t.ort);
+    }
+    return z;
+  };
+
+  const brief = (einleitung, schluss) => [
+    "Hallo,", "", einleitung, "",
+    "Termin:  " + t.titel,
+    ...eckdaten(),
+    "", schluss, "",
+    "Zum Vereinskalender: " + link, "",
+    "Den Termin sehen nur die Personen, mit denen er geteilt wurde — er steht nicht",
+    "im öffentlichen Kalender des Vereins.", "",
+    "Diese Nachricht wurde automatisch verschickt."
+  ].join("\n");
+
   for (const u of neu) {
-    await sende(u, "Neuer privater Termin im Vereinskalender",
-      `${von} hat einen privaten Termin mit dir geteilt: "${t.titel}". Bitte im Vereinskalender ansehen: ${link}`);
+    await sende(u, "Neuer privater Termin im Vereinskalender", brief(
+      `${von} hat einen privaten Termin mit dir geteilt.`,
+      "Weitere Einzelheiten und eventuelle Anhänge findest du im Vereinskalender."));
   }
   if (inhaltGeaendert) {
     for (const u of bestehend) {
-      await sende(u, "Privater Termin geändert: " + t.titel,
-        `${von} hat einen mit dir geteilten privaten Termin geändert: "${t.titel}". Bitte im Vereinskalender ansehen: ${link}`);
+      await sende(u, "Privater Termin geändert: " + t.titel, brief(
+        `${von} hat einen mit dir geteilten privaten Termin geändert. Hier der neue Stand:`,
+        "Bitte prüfe im Vereinskalender, ob der Termin so für dich passt."));
     }
   }
 }
