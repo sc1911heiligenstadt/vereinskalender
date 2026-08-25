@@ -193,6 +193,15 @@ body.can-edit .termin-card:hover { background: var(--blue-light); }
 }
 .tc-badge-umfrage { background: var(--gold-light); color: var(--gold); }
 .tc-badge-privat { background: var(--gray); color: var(--muted); }
+/* Termin aus einer anderen App (siehe QUELL_APPS in app.js) */
+.tc-badge-quelle { background: var(--gray); color: var(--muted); }
+
+/* Hinweis im Bearbeiten-Dialog, wenn der Termin aus einer anderen App stammt. */
+.quell-hinweis {
+  background: var(--gray); border-left: 3px solid var(--muted);
+  border-radius: 6px; padding: 10px 12px; margin-bottom: 14px;
+  font-size: 13px; line-height: 1.5; color: var(--text);
+}
 
 /* ---------- Umfrage: Abstimmen auf der Karte ---------- */
 .umfrage-block { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }

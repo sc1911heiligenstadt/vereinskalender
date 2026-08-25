@@ -286,6 +286,25 @@ function erstelltLabel(t) {
   return wer ? `Angelegt von ${wer} am ${datum}, ${zeit} Uhr` : `Angelegt am ${datum}, ${zeit} Uhr`;
 }
 
+// ---------- Termine, die aus einer anderen App kommen ----------
+// Seit 2026-08-25 legt das Fußballcamp seine anstehenden Camps hier selbst als
+// Termin ab (Worker: fcKalenderAbgleich). Solche Termine gehören dieser App
+// nicht: Titel, Datum, Ort, Zeit und Notiz werden beim nächsten Speichern
+// drüben überschrieben.
+//
+// ⚠️ Das Abzeichen ist kein Schmuck. Ohne es ändert hier jemand den Titel,
+// speichert, und alles springt beim nächsten Camp-Speichern zurück — ohne dass
+// irgendwo stünde warum. Wer den Termin hier trotzdem löscht, wird ihn los: der
+// Abgleich legt einen einmal gelöschten Termin bewusst nicht wieder an.
+const QUELL_APPS = { fussballcamp: "Aus dem Fußballcamp" };
+
+function istUebernommen(t) {
+  return !!(t && t.quelle && QUELL_APPS[t.quelle.app]);
+}
+function quelleName(t) {
+  return (t && t.quelle && QUELL_APPS[t.quelle.app]) || "Aus einer anderen App";
+}
+
 function terminCardHtml(t, isHero) {
   const start = terminAnzeigeStartIso(t);
   const end = terminEndIso(t);
@@ -297,7 +316,8 @@ function terminCardHtml(t, isHero) {
   const notiz = t.notiz ? `<div class="tc-notiz">${escapeHtml(t.notiz)}</div>` : "";
   const umfrage = terminIsUmfrage(t);
   const badges = `${umfrage ? `<span class="tc-badge tc-badge-umfrage">📊 Umfrage</span>` : ""}` +
-    `${t.privat ? `<span class="tc-badge tc-badge-privat">🔒 Privat</span>` : ""}`;
+    `${t.privat ? `<span class="tc-badge tc-badge-privat">🔒 Privat</span>` : ""}` +
+    `${istUebernommen(t) ? `<span class="tc-badge tc-badge-quelle">↪ ${escapeHtml(quelleName(t))}</span>` : ""}`;
   const erstellt = erstelltLabel(t);
   const erstelltHtml = erstellt ? `<div class="tc-meta">🕓 ${escapeHtml(erstellt)}</div>` : "";
   return `
@@ -680,6 +700,14 @@ async function openTerminModal(idOrNew) {
   renderShareGroupList();
 
   updateFormModeUi();
+
+  // ⚠️ Der Hinweis steht im Dialog, nicht nur auf der Karte: hier ist der
+  // Moment, in dem jemand gleich etwas eintippt, das nicht bleiben wird.
+  const quellHinweis = document.getElementById("tf-quelle-hinweis");
+  quellHinweis.classList.toggle("hidden", !istUebernommen(t));
+  if (istUebernommen(t)) {
+    quellHinweis.innerHTML = `<strong>${escapeHtml(quelleName(t))}.</strong> Titel, Datum, Ort, Zeit und Notiz werden dort gepflegt und hier beim nächsten Speichern überschrieben. Kategorie und Anhänge bleiben. Löschen kannst du den Termin — er kommt dann nicht wieder.`;
+  }
 
   document.getElementById("termin-modal-title").textContent = t ? "Termin bearbeiten" : "Neuer Termin";
   document.getElementById("btn-delete-termin").classList.toggle("hidden", !t);

@@ -16,6 +16,20 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.3",
+    groups: [
+      {
+        title: "Termine, die aus einer anderen App kommen",
+        items: [
+          "Anstehende Fußballcamps stehen ab jetzt von selbst im Kalender. Angelegt und gepflegt werden sie weiterhin im Fußballcamp-Tool.",
+          "Solche Termine tragen auf der Karte das Zeichen „Aus dem Fußballcamp“. Öffnest du einen davon zum Bearbeiten, steht oben im Fenster, was dort gepflegt wird und deshalb hier überschrieben wird: Titel, Datum, Ort, Zeit und Notiz.",
+          "Kategorie und Anhänge gehören dagegen dir — die bleiben stehen, auch wenn sich am Camp etwas ändert.",
+          "Löschen kannst du so einen Termin ganz normal. Er kommt dann nicht wieder."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.2",
     groups: [
       {
