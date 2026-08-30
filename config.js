@@ -16,6 +16,18 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.5",
+    groups: [
+      {
+        title: "Beim Sitzungsende wird auch alles neben der Seite geräumt",
+        items: [
+          "Beim Sitzungsende wurde die Seite bereits geleert. Der Termin-Dialog steht aber daneben und blieb mit Namen und Eingaben stehen. Jetzt wird er mitgeleert.",
+          "Der Hinweis erscheint außerdem an jeder Stelle, an der die Anmeldung wegfällt — vorher nur bei einem Teil der Wege."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.4",
     groups: [
       {

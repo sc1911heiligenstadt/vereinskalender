@@ -30,13 +30,13 @@ function getSessionToken() {
 
 async function gatewayRequest(payload) {
   const token = getSessionToken();
-  if (!token) throw new NotLoggedInError();
+  if (!token) { if (typeof raeumeBeiSitzungsverlust === "function") raeumeBeiSitzungsverlust(); throw new NotLoggedInError(); }
   const resp = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
     body: JSON.stringify(payload)
   });
-  if (resp.status === 401) throw new NotLoggedInError("Sitzung abgelaufen");
+  if (resp.status === 401) { if (typeof raeumeBeiSitzungsverlust === "function") raeumeBeiSitzungsverlust(); throw new NotLoggedInError("Sitzung abgelaufen"); }
   if (resp.status === 403) {
     // Den Grund des Servers durchreichen statt pauschal "Kein Zugriff auf dieses
     // Tool": der Worker unterscheidet fehlenden Tool-Zugriff von fehlendem
@@ -202,13 +202,13 @@ async function gatewayUploadFile(file) {
 // ist nicht öffentlich). Rückgabe eignet sich für URL.createObjectURL.
 async function gatewayFetchFileBlob(id) {
   const token = getSessionToken();
-  if (!token) throw new NotLoggedInError();
+  if (!token) { if (typeof raeumeBeiSitzungsverlust === "function") raeumeBeiSitzungsverlust(); throw new NotLoggedInError(); }
   const resp = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
     body: JSON.stringify({ action: "dav-file-get", app: GATEWAY_APP_ID, id })
   });
-  if (resp.status === 401) throw new NotLoggedInError("Sitzung abgelaufen");
+  if (resp.status === 401) { if (typeof raeumeBeiSitzungsverlust === "function") raeumeBeiSitzungsverlust(); throw new NotLoggedInError("Sitzung abgelaufen"); }
   if (!resp.ok) throw new Error("Datei nicht abrufbar (HTTP " + resp.status + ")");
   return resp.blob();
 }
