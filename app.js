@@ -554,17 +554,30 @@ function renderAnhangEditList() {
 }
 
 // ---------- Teilen mit Nutzern/Gruppen (nur bei privaten Terminen) ----------
+// Merkt sich den LAUFENDEN Ladevorgang, nicht nur das Ergebnis: init() stoesst
+// das Verzeichnis parallel zu gatewayLoad() an, startApp() wartet danach nur
+// noch auf dieselbe Promise statt einen zweiten Aufruf loszuschicken. Vorher
+// lief list-directory erst NACH dav-load an -- ein voller Roundtrip (~180 ms),
+// den jeder Nutzer vor dem ersten Bild abwartete, obwohl keiner der beiden
+// Aufrufe den anderen braucht. Gleiches Muster wie ladePdfLib in raumnutzung.
+let directoryLadevorgang = null;
 async function ensureDirectoryLoaded() {
   if (directoryUsers && directoryGroups) return;
-  try {
-    const dir = await fetchDirectory();
-    directoryUsers = Array.isArray(dir.users) ? dir.users : [];
-    directoryGroups = Array.isArray(dir.groups) ? dir.groups : [];
-  } catch (e) {
-    console.warn("Nutzer-/Gruppenverzeichnis konnte nicht geladen werden", e);
-    directoryUsers = directoryUsers || [];
-    directoryGroups = directoryGroups || [];
-  }
+  if (directoryLadevorgang) return directoryLadevorgang;
+  directoryLadevorgang = (async () => {
+    try {
+      const dir = await fetchDirectory();
+      directoryUsers = Array.isArray(dir.users) ? dir.users : [];
+      directoryGroups = Array.isArray(dir.groups) ? dir.groups : [];
+    } catch (e) {
+      console.warn("Nutzer-/Gruppenverzeichnis konnte nicht geladen werden", e);
+      directoryUsers = directoryUsers || [];
+      directoryGroups = directoryGroups || [];
+    } finally {
+      directoryLadevorgang = null;
+    }
+  })();
+  return directoryLadevorgang;
 }
 
 function renderShareUserChips() {
@@ -1331,6 +1344,10 @@ async function startApp() {
 async function init() {
   setupListeners();
   if (!getSessionToken()) { showConnectScreen(); return; }
+  // Das Nutzerverzeichnis laeuft ab hier parallel zu dav-load; startApp() findet
+  // es fertig vor oder wartet auf dieselbe Promise (siehe ensureDirectoryLoaded).
+  // Bewusst NACH dem Token-Check: ohne Token soll kein Aufruf rausgehen.
+  ensureDirectoryLoaded();
   try {
     const data = await gatewayLoad();
     appData = normalizeData(data);

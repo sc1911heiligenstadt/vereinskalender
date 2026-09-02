@@ -16,6 +16,17 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.1",
+    groups: [
+      {
+        title: "Der Kalender ist beim Öffnen schneller da",
+        items: [
+          "Das Nutzerverzeichnis (für „Angelegt von …“ auf den Karten) wurde bisher erst geholt, nachdem die Termine geladen waren — ein Roundtrip, auf den jeder vor dem ersten Bild wartete. Jetzt laufen beide Abfragen gemeinsam los."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.0",
     groups: [
       {
