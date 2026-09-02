@@ -16,70 +16,6 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
-    version: "1.5",
-    groups: [
-      {
-        title: "Beim Sitzungsende wird auch alles neben der Seite geräumt",
-        items: [
-          "Beim Sitzungsende wurde die Seite bereits geleert. Der Termin-Dialog steht aber daneben und blieb mit Namen und Eingaben stehen. Jetzt wird er mitgeleert.",
-          "Der Hinweis erscheint außerdem an jeder Stelle, an der die Anmeldung wegfällt — vorher nur bei einem Teil der Wege."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.4",
-    groups: [
-      {
-        title: "Beim Abmelden bleibt nichts stehen",
-        items: [
-          "Läuft die Anmeldung ab, während die App offen ist — zum Beispiel weil ein Speichern nach längerer Pause fehlschlägt —, erscheint wie bisher der Hinweis „bitte neu anmelden“.",
-          "Neu ist: der Bildschirm dahinter wird jetzt auch geleert. Vorher wurde er nur unsichtbar gemacht, und alles Angezeigte blieb im Browser stehen — sichtbar für jeden, der sich an denselben Rechner setzt und nachschaut.",
-          "Für dich ändert sich nichts: der Weg zurück war schon immer ein Neuladen der Seite."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.3",
-    groups: [
-      {
-        title: "Termine, die aus einer anderen App kommen",
-        items: [
-          "Anstehende Fußballcamps stehen ab jetzt von selbst im Kalender. Angelegt und gepflegt werden sie weiterhin im Fußballcamp-Tool.",
-          "Solche Termine tragen auf der Karte das Zeichen „Aus dem Fußballcamp“. Öffnest du einen davon zum Bearbeiten, steht oben im Fenster, was dort gepflegt wird und deshalb hier überschrieben wird: Titel, Datum, Ort, Zeit und Notiz.",
-          "Kategorie und Anhänge gehören dagegen dir — die bleiben stehen, auch wenn sich am Camp etwas ändert.",
-          "Löschen kannst du so einen Termin ganz normal. Er kommt dann nicht wieder."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.2",
-    groups: [
-      {
-        title: "Am Handy",
-        items: [
-          "Bisher brach die Reiterleiste selbst um, die rechte Reiter-Gruppe darin aber nicht: Sie rutschte als ein Stück in die zweite Zeile und lief dort weiter über den rechten Rand hinaus. Jetzt bricht auch sie um, sobald sie zu breit wird. Zu sehen ist das nur, wenn genug Reiter nebeneinanderstehen — bis dahin sieht alles aus wie bisher."
-        ]
-      }
-    ]
-  },
-  {
-    version: "1.1",
-    groups: [
-      {
-        title: "Ausführlichere E-Mails beim Teilen",
-        items: [
-          "Die E-Mail an die Personen, mit denen ein privater Termin geteilt wird, nennt jetzt Titel, Tag, Uhrzeit und Ort direkt in der Nachricht — vorher stand dort nur ein Satz mit dem Titel und ein Link.",
-          "Bei einer Terminumfrage listet die E-Mail alle zur Auswahl stehenden Tage samt Uhrzeiten auf und bittet um die Abstimmung.",
-          "Wird ein bereits geteilter Termin geändert, steht der neue Stand mit allen Eckdaten in der E-Mail, nicht nur der Hinweis, dass sich etwas geändert hat.",
-          "Die Notiz zum Termin bleibt bewusst draußen: Titel, Tag und Ort reichen zum Einordnen, alle Einzelheiten stehen weiterhin nur in der App."
-        ]
-      }
-    ]
-  },
-  {
     version: "1.0",
     groups: [
       {
@@ -95,7 +31,7 @@ const APP_CHANGELOG = [
         title: "Termine eintragen",
         items: [
           "Titel, Kategorie, Datum — auch mehrtägig —, wahlweise Uhrzeit oder ganztägig, Ort und Notiz.",
-          "Zu jedem Termin lassen sich Dateien anhängen: PDF, Bilder oder andere Formate. Alle angemeldeten Nutzer können sie öffnen oder herunterladen."
+          "Zu jedem Termin lassen sich Dateien anhängen: PDF, Bilder oder andere Formate, bis 10 MB je Datei. Alle angemeldeten Nutzer können sie öffnen oder herunterladen."
         ]
       },
       {
@@ -103,7 +39,9 @@ const APP_CHANGELOG = [
         items: [
           "Ein Termin lässt sich als Privattermin markieren — dann sieht ihn nur, wer ihn angelegt hat.",
           "Private Termine lassen sich gezielt mit einzelnen Personen über ein Suchfeld oder mit ganzen Gruppen teilen. Diese sehen den Termin dann zusätzlich.",
-          "Wer einen privaten Termin geteilt bekommt, erhält eine E-Mail — beim ersten Teilen und bei späteren Änderungen."
+          "Wer einen privaten Termin geteilt bekommt, erhält eine E-Mail — beim ersten Teilen und bei späteren Änderungen.",
+          "Die E-Mail nennt Titel, Tag, Uhrzeit und Ort; bei einer Umfrage listet sie alle zur Auswahl stehenden Tage samt Uhrzeiten auf.",
+          "Die Notiz zum Termin bleibt bewusst draußen: Titel, Tag und Ort reichen zum Einordnen, alle Einzelheiten stehen weiterhin nur in der App."
         ]
       },
       {
@@ -119,6 +57,15 @@ const APP_CHANGELOG = [
           "Uhrzeiten lassen sich bei laufender Umfrage nachtragen, ohne dass abgegebene Stimmen verloren gehen. Wer den Termin geteilt bekommen hat, wird über die Änderung informiert.",
           "Angezeigt werden nur die Terminvorschläge, die noch bevorstehen. Ein Vorschlagstag, der vorbei ist, verschwindet am Folgetag von der Karte — auch wenn weitere Vorschläge desselben Termins noch kommen.",
           "Datum und Einordnung in der Liste richten sich nach dem nächsten noch offenen Vorschlag, nicht nach dem ersten überhaupt. Die Übersicht zeigt damit dasselbe wie das Fenster „Nächste Termine“ auf der Startseite."
+        ]
+      },
+      {
+        title: "Termine, die aus einer anderen App kommen",
+        items: [
+          "Anstehende Fußballcamps stehen von selbst im Kalender. Angelegt und gepflegt werden sie weiterhin im Fußballcamp-Tool.",
+          "Solche Termine tragen auf der Karte das Zeichen „Aus dem Fußballcamp“. Wird ein solcher Termin zum Bearbeiten geöffnet, steht oben im Fenster, was dort gepflegt und deshalb hier überschrieben wird: Titel, Datum, Ort, Zeit und Notiz.",
+          "Kategorie und Anhänge gehören dagegen dem Kalender — die bleiben stehen, auch wenn sich am Camp etwas ändert.",
+          "Löschen lässt sich so ein Termin ganz normal. Er kommt dann nicht wieder."
         ]
       },
       {
@@ -149,16 +96,17 @@ const APP_CHANGELOG = [
       {
         title: "Kategorien",
         items: [
-          "Kategorien für Termine anlegen, umbenennen, umfärben und löschen. Sie stehen danach im Termin-Formular zur Auswahl."
+          "Kategorien für Termine anlegen, umbenennen, umfärben und löschen. Sie stehen danach im Termin-Formular zur Auswahl und geben der Karte ihre Farbe."
         ]
       },
       {
         title: "Wer darf was",
         items: [
-          "Sehen: alle Termine, Anhänge öffnen und bei Umfragen abstimmen.",
+          "Sehen: alle Termine, Anhänge öffnen, bei Umfragen abstimmen und sich den Kalender-Link erzeugen.",
           "Bearbeiten: Termine anlegen, ändern und löschen, Dateien anhängen, Termine teilen.",
           "Administrieren: die Kategorien im Reiter „Einstellungen“ pflegen.",
-          "Der Reiter „Info“ ist für alle sichtbar."
+          "Der Reiter „Info“ steht jedem angemeldeten Nutzer offen.",
+          "Fällt die Anmeldung weg, während die App offen ist, räumt sie den Bildschirm samt Termin-Dialog, statt Namen und Eingaben im Hintergrund lesbar zu lassen."
         ]
       },
       {
@@ -169,7 +117,7 @@ const APP_CHANGELOG = [
         ]
       },
       {
-        title: "Daten & Speicherung",
+        title: "Daten und Speicherung",
         items: [
           "Gespeichert wird in der Vereins-Nextcloud über die zentrale Anmeldung der Tools-Übersicht — ein eigenes Passwort braucht es nicht.",
           "Ändern zwei Geräte gleichzeitig denselben Stand, erkennt die App das, lädt den fremden Stand nach und sagt Bescheid."
