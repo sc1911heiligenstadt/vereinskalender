@@ -1,0 +1,1421 @@
+// ---------- Helpers ----------
+function uuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const MONATE_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function parseIso(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+function fmtDate(iso) {
+  if (!ISO_RE.test(iso || "")) return iso || "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+// Effektives Enddatum eines Termins (mehrtägig: endDatum, sonst datum).
+function terminEndIso(t) {
+  return t.endDatum && ISO_RE.test(t.endDatum) && t.endDatum >= t.datum ? t.endDatum : t.datum;
+}
+// Ein Termin ist vergangen, sobald sein letzter Tag vor heute liegt (ISO-Strings
+// vergleichen sich lexikografisch korrekt als Datum).
+function isPast(t) { return terminEndIso(t) < todayIso(); }
+function isUpcoming(t) { return ISO_RE.test(t.datum || "") && !isPast(t); }
+
+// Sortiert wird nach dem ANZEIGE-Start (siehe terminAnzeigeStartIso): bei einer
+// Umfrage ist das der früheste noch kommende Vorschlag, nicht t.datum -- sonst
+// bliebe ein Termin, dessen erster Vorschlagstag vorbei ist, ganz oben als
+// "Nächster Termin" stehen, obwohl dieser Tag gar nicht mehr angezeigt wird.
+function sortKey(t) {
+  const c = umfrageErsterSichtbarer(t);
+  if (c) return umfrageCandSortKey(c);
+  return `${t.datum}T${(t.ganztags ? "" : t.startZeit) || "00:00"}`;
+}
+function sortTermine(a, b) { return sortKey(a).localeCompare(sortKey(b)); }
+
+function monthKey(iso) { return iso.slice(0, 7); }
+function monthLabel(iso) { const dt = parseIso(iso); return `${MONATE[dt.getMonth()]} ${dt.getFullYear()}`; }
+
+// Datumsspanne kompakt: "17.08.2026" bzw. "17.–20.08.2026" / "28.02.–02.03.2026".
+function terminDatumLabel(t) {
+  const start = t.datum, end = terminEndIso(t);
+  if (end === start) return fmtDate(start);
+  const [ys, ms, ds] = start.split("-"), [ye, me, de] = end.split("-");
+  if (ys === ye && ms === me) return `${ds}.–${de}.${ms}.${ys}`;
+  if (ys === ye) return `${ds}.${ms}.–${de}.${me}.${ys}`;
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
+}
+function terminZeitLabel(t) {
+  if (t.ganztags || (!t.startZeit && !t.endZeit)) return "ganztägig";
+  if (t.startZeit && t.endZeit) return `${t.startZeit}–${t.endZeit} Uhr`;
+  if (t.startZeit) return `ab ${t.startZeit} Uhr`;
+  return `bis ${t.endZeit} Uhr`;
+}
+// Wie terminZeitLabel, aber für einen einzelnen Umfrage-Terminvorschlag: liefert
+// LEER statt "ganztägig", wenn keine Zeit gesetzt ist -- ein Vorschlag ohne
+// Uhrzeit soll auf der Karte einfach nur das Datum zeigen, nicht "ganztägig".
+function umfrageZeitLabel(c) {
+  if (!c) return "";
+  if (c.startZeit && c.endZeit) return `${c.startZeit}–${c.endZeit} Uhr`;
+  if (c.startZeit) return `ab ${c.startZeit} Uhr`;
+  if (c.endZeit) return `bis ${c.endZeit} Uhr`;
+  return "";
+}
+// Fachlicher Schlüssel eines Vorschlags (Datum + Uhrzeiten). Zwei Vorschläge am
+// selben Tag zu verschiedenen Uhrzeiten sind AUSDRÜCKLICH zwei Vorschläge --
+// dedupliziert wird deshalb über diesen Schlüssel, nicht über das Datum allein.
+function umfrageCandKey(c) { return `${c.datum}|${c.startZeit || ""}|${c.endZeit || ""}`; }
+function umfrageCandSortKey(c) { return `${c.datum}T${c.startZeit || "00:00"}`; }
+
+// Terminvorschläge einer Umfrage OHNE die bereits vergangenen Tage. Ein Termin
+// mit mehreren Vorschlägen bleibt sichtbar, solange irgendein Vorschlag noch
+// kommt (t.endDatum = spätester Vorschlag), aber die einzelnen abgelaufenen
+// Vorschlagstage gehören dann nicht mehr auf die Karte -- die Übersicht ist eine
+// Vorschau, kein Rückblick. Gefiltert wird nur beim Anzeigen: die Stimmen zu
+// einem abgelaufenen Vorschlag bleiben in den Daten stehen, damit das
+// nachträgliche Ergänzen einer Uhrzeit sie nicht mitreißt.
+function umfrageSichtbareTermine(t) {
+  if (!terminIsUmfrage(t)) return [];
+  const heute = todayIso();
+  return t.umfrage.termine.filter((c) => c && ISO_RE.test(c.datum || "") && c.datum >= heute);
+}
+// Der früheste noch kommende Vorschlag -- null, wenn es keine Umfrage ist oder
+// (bei krummen Daten) kein Vorschlag mehr in der Zukunft liegt.
+function umfrageErsterSichtbarer(t) {
+  const cands = umfrageSichtbareTermine(t);
+  if (!cands.length) return null;
+  return cands.reduce((a, c) => (umfrageCandSortKey(c) < umfrageCandSortKey(a) ? c : a), cands[0]);
+}
+// Datum, unter dem der Termin in der Liste erscheint: bei einer Umfrage der
+// früheste noch kommende Vorschlag, sonst schlicht t.datum. t.datum selbst bleibt
+// bei Umfragen bewusst der früheste Vorschlag ÜBERHAUPT (Sortier- und
+// Vergangenheitslogik hängen daran, siehe CLAUDE.md).
+function terminAnzeigeStartIso(t) {
+  const c = umfrageErsterSichtbarer(t);
+  return c ? c.datum : t.datum;
+}
+
+function wochentagLabel(iso) { return WOCHENTAGE[parseIso(iso).getDay()]; }
+
+// ---------- State ----------
+let appData = { meta: {}, kategorien: [], termine: [] };
+let currentUser = null;
+let editingTerminId = null;
+// Anhänge, die im offenen Formular gerade bearbeitet werden. Neue Dateien werden
+// erst beim Speichern hochgeladen (kein Waisen-Upload beim Abbrechen).
+let pendingAnhaenge = [];   // Elemente: {id,name,mime,size,existing:true} | {file,name,mime,size,neu:true}
+let removedExistingIds = []; // Ids bestehender Anhänge, die beim Speichern gelöscht werden
+let persistTimer = null;
+
+// Nutzer/Gruppen-Verzeichnis für den "Teilen mit"-Picker (nur für Bearbeiter,
+// einmalig beim ersten Öffnen des Formulars geladen).
+let directoryUsers = null;   // [{username, displayName}] | null solange nicht geladen
+let directoryGroups = null;  // [{id, name}]
+let pendingShareUsers = [];  // [{username, displayName}] im gerade offenen Formular
+let pendingShareGroupIds = []; // [groupId] im gerade offenen Formular
+// Terminvorschläge einer Umfrage im gerade offenen Formular.
+let pendingUmfrageTermine = []; // [{id, datum}]
+
+// ---------- Normalisierung & Lookups ----------
+function normalizeData(data) {
+  const d = data && typeof data === "object" ? data : {};
+  return {
+    meta: d.meta && typeof d.meta === "object" ? d.meta : {},
+    kategorien: Array.isArray(d.kategorien) && d.kategorien.length ? d.kategorien : DEFAULT_KATEGORIEN.slice(),
+    termine: Array.isArray(d.termine) ? d.termine : []
+  };
+}
+function kategorieById(id) { return appData.kategorien.find((k) => k.id === id) || null; }
+function katFarbe(id) { const k = kategorieById(id); return k ? k.farbe : "#6b7280"; }
+function katName(id) { const k = kategorieById(id); return k ? k.name : "—"; }
+
+// ---------- Rechte / Nutzer ----------
+// Bearbeiten dürfen Site-Admins sowie Nutzer, deren Gruppe in der Tools-Übersicht
+// für diese App Bearbeiten-Rechte hat (server-seitig aufgelöst, siehe fetchMe in
+// db.js) — alle anderen eingeloggten Nutzer dürfen die Termine nur ansehen.
+function canEdit() {
+  if (!currentUser) return false;
+  return currentUser.isAdmin || !!currentUser.canEdit;
+}
+
+// Sichtbarkeit eines Termins für den aktuell eingeloggten Nutzer: nicht-private
+// Termine sind wie bisher für alle eingeloggten Nutzer sichtbar. Private Termine
+// sieht nur der Ersteller, explizit geteilte Nutzer/Gruppen sowie Admins (gleiches
+// Bypass-Muster wie bei der Tool-Sichtbarkeit in der Tools-Übersicht).
+function terminVisibleFor(t) {
+  if (!t.privat) return true;
+  if (!currentUser) return false;
+  if (currentUser.isAdmin) return true;
+  if (t.ersteller && t.ersteller === currentUser.username) return true;
+  if (Array.isArray(t.geteiltUsers) && t.geteiltUsers.includes(currentUser.username)) return true;
+  if (Array.isArray(t.geteiltGruppen) && Array.isArray(currentUser.groupIds) &&
+      t.geteiltGruppen.some((g) => currentUser.groupIds.includes(g))) return true;
+  return false;
+}
+
+function terminIsUmfrage(t) { return !!(t.umfrage && t.umfrage.aktiv && Array.isArray(t.umfrage.termine) && t.umfrage.termine.length); }
+
+function renderHeaderUser() {
+  const el = document.getElementById("header-user");
+  const el2 = document.getElementById("info-user");
+  if (!currentUser) { if (el) el.textContent = ""; if (el2) el2.textContent = ""; return; }
+  const name = (currentUser.vorname || currentUser.nachname)
+    ? `${currentUser.vorname || ""} ${currentUser.nachname || ""}`.trim()
+    : currentUser.username;
+  const rolle = currentUser.isAdmin ? " (Admin)" : (canEdit() ? " (Bearbeiter)" : "");
+  if (el) el.textContent = "👤 " + name + rolle;
+  if (el2) el2.textContent = "Angemeldet als " + name + rolle +
+    (canEdit() ? "" : " — Termine eintragen ist der Geschäftsstelle vorbehalten.");
+}
+
+// Dritte Stufe "Administrieren" (Tools-Übersicht, seit 2026-07-24): die
+// Kategorien-Verwaltung (Einstellungen-Tab) hängt an dieser Stufe — Bearbeiter
+// pflegen Termine, die Kategorien-Struktur pflegt die Administration.
+function canAdmin() {
+  if (!currentUser) return false;
+  return currentUser.isAdmin || !!currentUser.canAdmin;
+}
+
+function applyAdminVisibility() {
+  const editable = canEdit();
+  const admin = canAdmin();
+  document.body.classList.toggle("can-edit", editable);
+  document.querySelectorAll(".editor-only").forEach((el) => el.classList.toggle("hidden", !editable));
+  document.querySelectorAll(".admin-only").forEach((el) => el.classList.toggle("hidden", !admin));
+}
+
+// ---------- Render: Termine ----------
+function anhaengeHtml(t) {
+  if (!Array.isArray(t.anhaenge) || t.anhaenge.length === 0) return "";
+  return `<div class="tc-anhaenge">` + t.anhaenge.map((a) =>
+    `<button type="button" class="anhang" data-file-id="${escapeHtml(a.id)}" data-file-name="${escapeHtml(a.name)}" data-mime="${escapeHtml(a.mime || "")}">📎 ${escapeHtml(a.name)}</button>`
+  ).join("") + `</div>`;
+}
+
+// Terminvorschläge einer Umfrage als klickbare Haken/Kreuz-Zeilen direkt auf der
+// Karte — abstimmen geht ohne das Formular zu öffnen (onCardClick fängt Klicks
+// auf .umfrage-vote vor dem Karten-Klick-zum-Bearbeiten ab).
+function umfrageHtml(t) {
+  const stimmen = (t.umfrage && t.umfrage.stimmen) || {};
+  const meinName = currentUser ? currentUser.username : null;
+  const sichtbar = umfrageSichtbareTermine(t);
+  if (!sichtbar.length) return "";
+  const rows = sichtbar.map((c) => {
+    let ja = 0, nein = 0, meins = null;
+    Object.entries(stimmen).forEach(([user, votes]) => {
+      const v = votes ? votes[c.id] : null;
+      if (v === "ja") ja++; else if (v === "nein") nein++;
+      if (user === meinName) meins = v || null;
+    });
+    const dt = parseIso(c.datum);
+    const zeit = umfrageZeitLabel(c);
+    return `
+      <div class="umfrage-row" data-cand-id="${escapeHtml(c.id)}">
+        <div class="umfrage-row-main">
+          <span class="umfrage-date">${escapeHtml(WOCHENTAGE[dt.getDay()])}, ${escapeHtml(fmtDate(c.datum))}${zeit ? `<span class="umfrage-time">🕘 ${escapeHtml(zeit)}</span>` : ""}</span>
+          <div class="umfrage-buttons">
+            <button type="button" class="umfrage-vote ja${meins === "ja" ? " active" : ""}" data-termin-id="${escapeHtml(t.id)}" data-cand-id="${escapeHtml(c.id)}" data-val="ja">✓ ${ja}</button>
+            <button type="button" class="umfrage-vote nein${meins === "nein" ? " active" : ""}" data-termin-id="${escapeHtml(t.id)}" data-cand-id="${escapeHtml(c.id)}" data-val="nein">✗ ${nein}</button>
+            <button type="button" class="umfrage-details-toggle" data-termin-id="${escapeHtml(t.id)}" data-cand-id="${escapeHtml(c.id)}" aria-label="Zu-/Absagen einsehen" title="Zu-/Absagen einsehen">👥</button>
+          </div>
+        </div>
+        <div class="umfrage-details hidden"></div>
+      </div>`;
+  }).join("");
+  return `<div class="umfrage-block"><div class="umfrage-hint">📊 Umfrage — bitte für passende Termine abstimmen</div>${rows}</div>`;
+}
+
+// Löst einen Nutzernamen über das (lazy geladene) Verzeichnis in einen
+// Anzeigenamen auf; Fallback auf den rohen Nutzernamen, falls unbekannt.
+function displayNameFor(username) {
+  const found = (directoryUsers || []).find((u) => u.username === username);
+  return found ? found.displayName : username;
+}
+
+// Zeigt/versteckt die Liste der Zu-/Absager einer Umfrage-Terminzeile. Lädt das
+// Nutzerverzeichnis bei Bedarf nach (auch für Nicht-Bearbeiter, die bislang noch
+// keins geladen haben) — Namen werden erst beim ersten Aufklappen aufgelöst.
+async function toggleUmfrageDetails(terminId, candId, rowEl) {
+  if (!rowEl) return;
+  const detailsEl = rowEl.querySelector(".umfrage-details");
+  if (!detailsEl.classList.contains("hidden")) { detailsEl.classList.add("hidden"); return; }
+
+  await ensureDirectoryLoaded();
+  const t = appData.termine.find((x) => x.id === terminId);
+  if (!t || !t.umfrage) return;
+  const stimmen = t.umfrage.stimmen || {};
+  const ja = [], nein = [];
+  Object.entries(stimmen).forEach(([user, votes]) => {
+    const v = votes ? votes[candId] : null;
+    if (v === "ja") ja.push(displayNameFor(user));
+    else if (v === "nein") nein.push(displayNameFor(user));
+  });
+  detailsEl.innerHTML =
+    `<div><strong>✓ Zusagen:</strong> ${ja.length ? ja.map(escapeHtml).join(", ") : "—"}</div>` +
+    `<div><strong>✗ Absagen:</strong> ${nein.length ? nein.map(escapeHtml).join(", ") : "—"}</div>`;
+  detailsEl.classList.remove("hidden");
+}
+
+// "Angelegt von <Name> am <Datum>, <Uhrzeit>" — nur wenn beide Angaben vorhanden
+// sind (bei Termine aus der Zeit vor 1.9 fehlt erstelltAm, dann kein Meta-Text).
+function erstelltLabel(t) {
+  if (!t.erstelltAm) return "";
+  const d = new Date(t.erstelltAm);
+  if (isNaN(d.getTime())) return "";
+  const datum = d.toLocaleDateString("de-DE");
+  const zeit = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const wer = t.ersteller ? displayNameFor(t.ersteller) : null;
+  return wer ? `Angelegt von ${wer} am ${datum}, ${zeit} Uhr` : `Angelegt am ${datum}, ${zeit} Uhr`;
+}
+
+// ---------- Termine, die aus einer anderen App kommen ----------
+// Seit 2026-08-25 legt das Fußballcamp seine anstehenden Camps hier selbst als
+// Termin ab (Worker: fcKalenderAbgleich). Solche Termine gehören dieser App
+// nicht: Titel, Datum, Ort, Zeit und Notiz werden beim nächsten Speichern
+// drüben überschrieben.
+//
+// ⚠️ Das Abzeichen ist kein Schmuck. Ohne es ändert hier jemand den Titel,
+// speichert, und alles springt beim nächsten Camp-Speichern zurück — ohne dass
+// irgendwo stünde warum. Wer den Termin hier trotzdem löscht, wird ihn los: der
+// Abgleich legt einen einmal gelöschten Termin bewusst nicht wieder an.
+const QUELL_APPS = { fussballcamp: "Aus dem Fußballcamp" };
+
+function istUebernommen(t) {
+  return !!(t && t.quelle && QUELL_APPS[t.quelle.app]);
+}
+function quelleName(t) {
+  return (t && t.quelle && QUELL_APPS[t.quelle.app]) || "Aus einer anderen App";
+}
+
+function terminCardHtml(t, isHero) {
+  const start = terminAnzeigeStartIso(t);
+  const end = terminEndIso(t);
+  const dt = parseIso(start);
+  const dayBadge = `<span class="tc-day">${dt.getDate()}</span><span class="tc-mon">${MONATE_KURZ[dt.getMonth()]}</span>` +
+    (end !== start ? `<span class="tc-range">bis ${fmtDate(end)}</span>` : "");
+  const farbe = katFarbe(t.kategorie);
+  const ort = t.ort ? `<div class="tc-sub">📍 ${escapeHtml(t.ort)}</div>` : "";
+  const notiz = t.notiz ? `<div class="tc-notiz">${escapeHtml(t.notiz)}</div>` : "";
+  const umfrage = terminIsUmfrage(t);
+  const badges = `${umfrage ? `<span class="tc-badge tc-badge-umfrage">📊 Umfrage</span>` : ""}` +
+    `${t.privat ? `<span class="tc-badge tc-badge-privat">🔒 Privat</span>` : ""}` +
+    `${istUebernommen(t) ? `<span class="tc-badge tc-badge-quelle">↪ ${escapeHtml(quelleName(t))}</span>` : ""}`;
+  const erstellt = erstelltLabel(t);
+  const erstelltHtml = erstellt ? `<div class="tc-meta">🕓 ${escapeHtml(erstellt)}</div>` : "";
+  return `
+    <div class="termin-card${isHero ? " is-hero" : ""}" data-id="${escapeHtml(t.id)}" style="--kat:${escapeHtml(farbe)}">
+      ${isHero ? `<div class="hero-label">Nächster Termin</div>` : ""}
+      <div class="tc-inner">
+        <div class="tc-date">${dayBadge}</div>
+        <div class="tc-body">
+          <div class="tc-top">
+            <span class="kat-chip"><span class="kat-dot" style="background:${escapeHtml(farbe)}"></span>${escapeHtml(katName(t.kategorie))}</span>
+            ${umfrage ? "" : `<span class="tc-time">🕘 ${escapeHtml(terminZeitLabel(t))}</span>`}
+            ${badges}
+          </div>
+          <div class="tc-title">${escapeHtml(t.titel)}</div>
+          ${umfrage ? "" : `<div class="tc-sub tc-datespan">📅 ${escapeHtml(wochentagLabel(start))}, ${escapeHtml(terminDatumLabel(t))}</div>`}
+          ${ort}
+          ${notiz}
+          ${umfrage ? umfrageHtml(t) : ""}
+          ${anhaengeHtml(t)}
+          ${erstelltHtml}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTermine() {
+  const upcoming = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t)).sort(sortTermine);
+  const heroEl = document.getElementById("hero");
+  const listEl = document.getElementById("termin-list");
+  const emptyEl = document.getElementById("termine-empty");
+  const countEl = document.getElementById("termine-count");
+  const weitereEl = document.getElementById("weitere-heading");
+
+  countEl.textContent = upcoming.length
+    ? `${upcoming.length} anstehende${upcoming.length === 1 ? "r Termin" : " Termine"}`
+    : "";
+
+  if (upcoming.length === 0) {
+    heroEl.innerHTML = "";
+    listEl.innerHTML = "";
+    weitereEl.classList.add("hidden");
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+
+  heroEl.innerHTML = terminCardHtml(upcoming[0], true);
+
+  const rest = upcoming.slice(1);
+  weitereEl.classList.toggle("hidden", rest.length === 0);
+
+  let html = "";
+  let lastMonth = null;
+  rest.forEach((t) => {
+    const anzeigeStart = terminAnzeigeStartIso(t);
+    const mk = monthKey(anzeigeStart);
+    if (mk !== lastMonth) {
+      html += `<div class="month-heading">${escapeHtml(monthLabel(anzeigeStart))}</div>`;
+      lastMonth = mk;
+    }
+    html += terminCardHtml(t, false);
+  });
+  listEl.innerHTML = html;
+}
+
+function renderVersionInfo() {
+  document.querySelectorAll("#version-badge, #version-badge-2").forEach((el) => { if (el) el.textContent = "v" + APP_VERSION; });
+  const list = document.getElementById("changelog-list");
+  if (!list) return;
+  list.innerHTML = APP_CHANGELOG.map((entry) => `
+    <div class="changelog-entry">
+      <div class="cv">Version ${escapeHtml(entry.version)}</div>
+      ${entry.groups.map((g) => `
+        <div class="changelog-group">
+          <div class="cg-title">${escapeHtml(g.title)}</div>
+          <ul class="cg-items">${g.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
+function renderAll() {
+  if (bildschirmGeraeumt) return;
+  renderTermine();
+  renderVersionInfo();
+  renderKategorien();
+}
+
+// ---------- Abo-Link für den eigenen Kalender ----------
+// Ein Kalenderprogramm kann sich nicht anmelden — es kennt nur eine Adresse.
+// Deshalb ist die URL selbst der Ausweis, und deshalb hängt an ihr auch ein
+// Entwerten-Knopf: ein Link, den man nicht loswird, wäre hier das eigentliche
+// Problem.
+let aboState = null;   // {aktiv, umfang, url, webcalUrl} | null solange nicht geladen
+let aboLaeuft = false; // verhindert Doppelklicks auf die Knöpfe
+
+function setAboStatus(text, art) {
+  const el = document.getElementById("abo-status");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "abo-status" + (art ? " " + art : "");
+}
+
+function renderAbo() {
+  const karte = document.getElementById("abo-karte");
+  if (!karte || !aboState) return;
+  const aktiv = !!aboState.aktiv;
+  document.getElementById("abo-aus").classList.toggle("hidden", aktiv);
+  document.getElementById("abo-an").classList.toggle("hidden", !aktiv);
+  if (!aktiv) {
+    // Ausblenden genügt nicht: ein entwerteter Link bliebe sonst im Feld stehen
+    // und ließe sich weiter herauskopieren — ein toter Wert, der wie ein gültiger
+    // aussieht.
+    document.getElementById("abo-link").value = "";
+    document.getElementById("btn-abo-oeffnen").removeAttribute("href");
+    return;
+  }
+
+  document.getElementById("abo-link").value = aboState.url || "";
+  const oeffnen = document.getElementById("btn-abo-oeffnen");
+  // webcal:// öffnet die Kalender-App direkt. Fehlt es (alter Worker), bleibt der
+  // https-Link — der lädt dann eine Datei herunter, was immer noch weiterhilft.
+  oeffnen.href = aboState.webcalUrl || aboState.url || "#";
+  const alle = aboState.umfang === "alle";
+  document.getElementById("abo-umfang-zeile").textContent = alle
+    ? "Enthält alle Termine, die du auch in der App siehst — einschließlich deiner privaten und der mit dir geteilten."
+    : "Enthält die allgemeinen Vereinstermine. Private Termine sind nicht dabei.";
+  document.getElementById("abo-umfang-alle").checked = alle;
+}
+
+async function ladeAboStatus() {
+  if (aboState) return; // einmal je Sitzung reicht — der Stand ändert sich nur hier
+  try {
+    const res = await gatewayAboStatus();
+    aboState = res && typeof res === "object" ? res : { aktiv: false };
+    renderAbo();
+  } catch (e) {
+    // Kennt der Worker die Aktion noch nicht, verschwindet die ganze Karte, statt
+    // einen roten Hinweis für etwas zu zeigen, das es serverseitig noch nicht gibt
+    // (gleiche Linie wie push-status in der Tools-Übersicht). Pages ist sofort
+    // live, der Worker braucht einen eigenen Deploy.
+    const karte = document.getElementById("abo-karte");
+    if (karte) karte.classList.add("hidden");
+    console.warn("Kalender-Abo nicht verfügbar", e);
+  }
+}
+
+async function aboAnlegen() {
+  if (aboLaeuft) return;
+  aboLaeuft = true;
+  setAboStatus("Link wird erzeugt…", "");
+  try {
+    const umfang = document.getElementById("abo-umfang-alle").checked ? "alle" : "oeffentlich";
+    aboState = await gatewayAboAnlegen(umfang);
+    renderAbo();
+    setAboStatus("Dein Kalender-Link ist bereit.", "ok");
+  } catch (e) {
+    setAboStatus("Der Link konnte nicht erzeugt werden: " + e.message, "fehler");
+  } finally {
+    aboLaeuft = false;
+  }
+}
+
+async function aboNeuErzeugen() {
+  // Bewusst mit Rückfrage: der bisherige Link hört dabei auf zu funktionieren,
+  // und in fremden Kalendern steht er dann als toter Eintrag.
+  if (!confirm("Einen neuen Link erzeugen? Der bisherige hört sofort auf zu funktionieren — " +
+               "in deinem Kalender musst du das Abo danach neu eintragen.")) return;
+  await aboAnlegen();
+}
+
+async function aboLoeschen() {
+  if (aboLaeuft) return;
+  if (!confirm("Den Link entwerten? Die Vereinstermine verschwinden danach aus deinem Kalender.")) return;
+  aboLaeuft = true;
+  setAboStatus("Link wird entwertet…", "");
+  try {
+    await gatewayAboLoeschen();
+    aboState = { aktiv: false };
+    renderAbo();
+    setAboStatus("Der Link ist entwertet. Du kannst dir jederzeit einen neuen erzeugen.", "ok");
+  } catch (e) {
+    setAboStatus("Der Link konnte nicht entwertet werden: " + e.message, "fehler");
+  } finally {
+    aboLaeuft = false;
+  }
+}
+
+async function aboKopieren() {
+  const feld = document.getElementById("abo-link");
+  if (!feld || !feld.value) return;
+  try {
+    // navigator.clipboard gibt es auf den älteren iOS-Geräten der Flotte nicht
+    // überall — der select/execCommand-Weg ist der Rückfallweg, nicht umgekehrt.
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(feld.value);
+    } else {
+      feld.removeAttribute("readonly");
+      feld.select();
+      feld.setSelectionRange(0, feld.value.length);
+      document.execCommand("copy");
+      feld.setAttribute("readonly", "readonly");
+    }
+    setAboStatus("Link kopiert.", "ok");
+  } catch (_) {
+    // Kein stiller Fehlschlag: sonst glaubt man, der Link sei in der Zwischenablage.
+    feld.select();
+    setAboStatus("Kopieren hat nicht geklappt — der Link ist markiert, bitte von Hand kopieren.", "fehler");
+  }
+}
+
+// ---------- Tabs ----------
+function switchTab(tab) {
+  document.querySelectorAll("nav button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-section").forEach((s) => s.classList.toggle("active", s.id === "tab-" + tab));
+  // Erst beim Öffnen des Tabs laden, nicht beim Seitenaufbau: sonst kostet jeder
+  // Aufruf der App einen zusätzlichen Worker-Rundlauf für eine Karte, die die
+  // meisten nie ansehen.
+  if (tab === "info") ladeAboStatus();
+}
+
+// ---------- Datei-Anhänge im Formular ----------
+function fillSelect(el, options) {
+  if (!el) return;
+  el.innerHTML = options.map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join("");
+}
+
+function renderAnhangEditList() {
+  const el = document.getElementById("tf-anhaenge");
+  if (pendingAnhaenge.length === 0) { el.innerHTML = `<span class="muted">Keine Datei angehängt.</span>`; return; }
+  el.innerHTML = pendingAnhaenge.map((a, i) =>
+    `<div class="anhang-edit"><span>📎 ${escapeHtml(a.name)}${a.neu ? ' <span class="muted">(neu)</span>' : ""}</span>` +
+    `<button type="button" class="anhang-remove" data-idx="${i}" aria-label="Entfernen">×</button></div>`
+  ).join("");
+}
+
+// ---------- Teilen mit Nutzern/Gruppen (nur bei privaten Terminen) ----------
+async function ensureDirectoryLoaded() {
+  if (directoryUsers && directoryGroups) return;
+  try {
+    const dir = await fetchDirectory();
+    directoryUsers = Array.isArray(dir.users) ? dir.users : [];
+    directoryGroups = Array.isArray(dir.groups) ? dir.groups : [];
+  } catch (e) {
+    console.warn("Nutzer-/Gruppenverzeichnis konnte nicht geladen werden", e);
+    directoryUsers = directoryUsers || [];
+    directoryGroups = directoryGroups || [];
+  }
+}
+
+function renderShareUserChips() {
+  const el = document.getElementById("tf-user-chips");
+  if (pendingShareUsers.length === 0) { el.innerHTML = ""; return; }
+  el.innerHTML = pendingShareUsers.map((u, i) =>
+    `<span class="share-chip">${escapeHtml(u.displayName)}<button type="button" class="share-chip-remove" data-idx="${i}" aria-label="Entfernen">×</button></span>`
+  ).join("");
+}
+
+function renderShareGroupList() {
+  const el = document.getElementById("tf-group-list");
+  const groups = directoryGroups || [];
+  if (groups.length === 0) { el.innerHTML = `<span class="muted">Keine Gruppen vorhanden.</span>`; return; }
+  el.innerHTML = groups.map((g) =>
+    `<label class="check-label share-group-item"><input type="checkbox" class="tf-group-checkbox" value="${escapeHtml(g.id)}" ${pendingShareGroupIds.includes(g.id) ? "checked" : ""} /> ${escapeHtml(g.name)}</label>`
+  ).join("");
+}
+
+function onUserSearchInput(e) {
+  const q = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById("tf-user-results");
+  if (!q) { resultsEl.classList.add("hidden"); resultsEl.innerHTML = ""; return; }
+  const chosen = new Set(pendingShareUsers.map((u) => u.username));
+  const matches = (directoryUsers || [])
+    .filter((u) => !chosen.has(u.username) && (u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)))
+    .slice(0, 8);
+  if (matches.length === 0) { resultsEl.classList.add("hidden"); resultsEl.innerHTML = ""; return; }
+  resultsEl.innerHTML = matches.map((u) =>
+    `<div class="share-result" data-username="${escapeHtml(u.username)}" data-name="${escapeHtml(u.displayName)}">${escapeHtml(u.displayName)}</div>`
+  ).join("");
+  resultsEl.classList.remove("hidden");
+}
+
+function onUserResultClick(e) {
+  const el = e.target.closest(".share-result");
+  if (!el) return;
+  pendingShareUsers.push({ username: el.dataset.username, displayName: el.dataset.name });
+  document.getElementById("tf-user-search").value = "";
+  document.getElementById("tf-user-results").classList.add("hidden");
+  document.getElementById("tf-user-results").innerHTML = "";
+  renderShareUserChips();
+}
+
+function onShareChipsClick(e) {
+  const btn = e.target.closest(".share-chip-remove");
+  if (!btn) return;
+  pendingShareUsers.splice(parseInt(btn.dataset.idx, 10), 1);
+  renderShareUserChips();
+}
+
+// ---------- Umfrage-Terminvorschläge im Formular ----------
+function renderUmfrageEditList() {
+  const el = document.getElementById("tf-umfrage-termine");
+  if (pendingUmfrageTermine.length === 0) { el.innerHTML = `<span class="muted">Noch keine Terminvorschläge.</span>`; return; }
+  // Uhrzeit gehört zum einzelnen Vorschlag, nicht zum Termin: bei einer Umfrage
+  // liegen die Vorschläge oft zu verschiedenen Zeiten, und das Termin-weite
+  // Zeit-Grid ist in diesem Modus ausgeblendet (siehe updateFormModeUi).
+  // Beide Zeitfelder sind optional -- leer heißt "keine Uhrzeit angegeben".
+  el.innerHTML = pendingUmfrageTermine.map((c, i) =>
+    `<div class="umfrage-edit-row">` +
+    `<input type="date" class="umfrage-cand-datum" data-idx="${i}" value="${escapeHtml(c.datum || "")}" aria-label="Datum des Terminvorschlags" />` +
+    `<input type="time" class="umfrage-cand-start" data-idx="${i}" value="${escapeHtml(c.startZeit || "")}" aria-label="Startzeit" title="Von (optional)" />` +
+    `<span class="umfrage-cand-sep">–</span>` +
+    `<input type="time" class="umfrage-cand-ende" data-idx="${i}" value="${escapeHtml(c.endZeit || "")}" aria-label="Endzeit" title="Bis (optional)" />` +
+    `<button type="button" class="anhang-remove umfrage-cand-remove" data-idx="${i}" aria-label="Entfernen">×</button></div>`
+  ).join("");
+}
+
+function addUmfrageTermin() {
+  pendingUmfrageTermine.push({ id: uuid(), datum: "", startZeit: "", endZeit: "" });
+  renderUmfrageEditList();
+}
+
+function onUmfrageListInput(e) {
+  const feld = e.target.classList.contains("umfrage-cand-datum") ? "datum"
+    : e.target.classList.contains("umfrage-cand-start") ? "startZeit"
+    : e.target.classList.contains("umfrage-cand-ende") ? "endZeit" : null;
+  if (!feld) return;
+  const idx = parseInt(e.target.dataset.idx, 10);
+  if (pendingUmfrageTermine[idx]) pendingUmfrageTermine[idx][feld] = e.target.value;
+}
+
+function onUmfrageListClick(e) {
+  const btn = e.target.closest(".umfrage-cand-remove");
+  if (!btn) return;
+  pendingUmfrageTermine.splice(parseInt(btn.dataset.idx, 10), 1);
+  renderUmfrageEditList();
+}
+
+// ---------- Termin-Formular ----------
+async function openTerminModal(idOrNew) {
+  if (!canEdit()) return;
+  const t = (typeof idOrNew === "string") ? appData.termine.find((x) => x.id === idOrNew) : null;
+  editingTerminId = t ? t.id : null;
+  removedExistingIds = [];
+  pendingAnhaenge = t && Array.isArray(t.anhaenge)
+    ? t.anhaenge.map((a) => ({ id: a.id, name: a.name, mime: a.mime, size: a.size, existing: true }))
+    : [];
+
+  fillSelect(document.getElementById("tf-kategorie"), appData.kategorien.map((k) => ({ value: k.id, label: k.name })));
+
+  document.getElementById("tf-titel").value = t ? (t.titel || "") : "";
+  document.getElementById("tf-kategorie").value = t ? t.kategorie : (appData.kategorien[0] ? appData.kategorien[0].id : "sonstiges");
+  document.getElementById("tf-ort").value = t ? (t.ort || "") : "";
+  document.getElementById("tf-datum").value = t ? (t.datum || "") : todayIso();
+  document.getElementById("tf-enddatum").value = (t && t.endDatum) ? t.endDatum : "";
+  document.getElementById("tf-ganztags").checked = t ? !!t.ganztags : true;
+  document.getElementById("tf-startzeit").value = (t && t.startZeit) ? t.startZeit : "";
+  document.getElementById("tf-endzeit").value = (t && t.endZeit) ? t.endZeit : "";
+  document.getElementById("tf-notiz").value = t ? (t.notiz || "") : "";
+  renderAnhangEditList();
+
+  pendingUmfrageTermine = (t && terminIsUmfrage(t))
+    ? t.umfrage.termine.map((c) => ({ id: c.id, datum: c.datum, startZeit: c.startZeit || "", endZeit: c.endZeit || "" }))
+    : [];
+  document.getElementById("tf-umfrage").checked = pendingUmfrageTermine.length > 0;
+  renderUmfrageEditList();
+
+  document.getElementById("tf-privat").checked = t ? !!t.privat : false;
+  pendingShareGroupIds = (t && Array.isArray(t.geteiltGruppen)) ? t.geteiltGruppen.slice() : [];
+  pendingShareUsers = [];
+  document.getElementById("tf-user-search").value = "";
+  document.getElementById("tf-user-results").classList.add("hidden");
+  document.getElementById("tf-user-results").innerHTML = "";
+  await ensureDirectoryLoaded();
+  if (t && Array.isArray(t.geteiltUsers)) {
+    pendingShareUsers = t.geteiltUsers.map((u) => {
+      const found = (directoryUsers || []).find((d) => d.username === u);
+      return { username: u, displayName: found ? found.displayName : u };
+    });
+  }
+  renderShareUserChips();
+  renderShareGroupList();
+
+  updateFormModeUi();
+
+  // ⚠️ Der Hinweis steht im Dialog, nicht nur auf der Karte: hier ist der
+  // Moment, in dem jemand gleich etwas eintippt, das nicht bleiben wird.
+  const quellHinweis = document.getElementById("tf-quelle-hinweis");
+  quellHinweis.classList.toggle("hidden", !istUebernommen(t));
+  if (istUebernommen(t)) {
+    quellHinweis.innerHTML = `<strong>${escapeHtml(quelleName(t))}.</strong> Titel, Datum, Ort, Zeit und Notiz werden dort gepflegt und hier beim nächsten Speichern überschrieben. Kategorie und Anhänge bleiben. Löschen kannst du den Termin — er kommt dann nicht wieder.`;
+  }
+
+  document.getElementById("termin-modal-title").textContent = t ? "Termin bearbeiten" : "Neuer Termin";
+  document.getElementById("btn-delete-termin").classList.toggle("hidden", !t);
+  document.getElementById("termin-modal").classList.remove("hidden");
+  document.getElementById("tf-titel").focus();
+}
+
+// Blendet Datum/Enddatum/Ganztägig gegen die Terminvorschlagsliste um, sobald
+// "Umfrage aktivieren" angehakt ist, und das Teilen-Feld gegen "Privattermin".
+function updateFormModeUi() {
+  const umfrage = document.getElementById("tf-umfrage").checked;
+  const ganz = document.getElementById("tf-ganztags").checked;
+  document.getElementById("tf-datum-field").classList.toggle("hidden", umfrage);
+  document.getElementById("tf-enddatum-field").classList.toggle("hidden", umfrage);
+  document.getElementById("tf-ganztags-field").classList.toggle("hidden", umfrage);
+  document.getElementById("tf-zeit-grid").classList.toggle("hidden", umfrage || ganz);
+  document.getElementById("tf-umfrage-wrap").classList.toggle("hidden", !umfrage);
+
+  const privat = document.getElementById("tf-privat").checked;
+  document.getElementById("tf-teilen-wrap").classList.toggle("hidden", !privat);
+}
+
+function closeTerminModal() {
+  document.getElementById("termin-modal").classList.add("hidden");
+  editingTerminId = null;
+  pendingAnhaenge = [];
+  removedExistingIds = [];
+  pendingShareUsers = [];
+  pendingShareGroupIds = [];
+  pendingUmfrageTermine = [];
+}
+
+async function saveTermin() {
+  const titel = document.getElementById("tf-titel").value.trim();
+  const kategorie = document.getElementById("tf-kategorie").value;
+  const ort = document.getElementById("tf-ort").value.trim();
+  const notiz = document.getElementById("tf-notiz").value.trim();
+  const umfrageAktiv = document.getElementById("tf-umfrage").checked;
+  const privat = document.getElementById("tf-privat").checked;
+
+  if (!titel) { alert("Bitte einen Titel eingeben."); return; }
+
+  let datum, endDatum, ganztags, startZeit, endZeit, umfrageCandidates = null;
+
+  if (umfrageAktiv) {
+    // Je Formularzeile Datum + optionale Uhrzeiten einsammeln. Die Id kommt über
+    // die Zeilen-Position aus pendingUmfrageTermine, NICHT mehr über das Datum:
+    // sonst verliert ein bestehender Vorschlag, dem man nachträglich eine Uhrzeit
+    // gibt, seine Id -- und mit ihr alle bereits abgegebenen Stimmen.
+    const rows = Array.from(document.querySelectorAll(".umfrage-edit-row")).map((rowEl) => {
+      const datumEl = rowEl.querySelector(".umfrage-cand-datum");
+      const vorhanden = pendingUmfrageTermine[parseInt(datumEl.dataset.idx, 10)];
+      return {
+        id: (vorhanden && vorhanden.id) || uuid(),
+        datum: datumEl.value,
+        startZeit: rowEl.querySelector(".umfrage-cand-start").value || undefined,
+        endZeit: rowEl.querySelector(".umfrage-cand-ende").value || undefined
+      };
+    }).filter((c) => ISO_RE.test(c.datum));
+
+    const gesehen = [];
+    umfrageCandidates = rows
+      .filter((c) => {
+        const k = umfrageCandKey(c);
+        if (gesehen.indexOf(k) !== -1) return false;
+        gesehen.push(k);
+        return true;
+      })
+      .sort((a, b) => umfrageCandSortKey(a).localeCompare(umfrageCandSortKey(b)));
+
+    if (umfrageCandidates.length === 0) { alert("Bitte mindestens einen gültigen Terminvorschlag eintragen."); return; }
+    const falscheSpanne = umfrageCandidates.find((c) => c.startZeit && c.endZeit && c.endZeit <= c.startZeit);
+    if (falscheSpanne) {
+      alert(`Beim Terminvorschlag am ${fmtDate(falscheSpanne.datum)} muss die Endzeit nach der Startzeit liegen.`);
+      return;
+    }
+
+    // datum/endDatum bleiben frühester bzw. spätester Vorschlagstag, damit die
+    // bestehende Sortier- und Vergangenheitslogik unverändert weiterläuft. Die
+    // Uhrzeiten leben ausschließlich in den Vorschlägen; der Termin selbst bleibt
+    // ganztägig.
+    const letztesDatum = umfrageCandidates[umfrageCandidates.length - 1].datum;
+    datum = umfrageCandidates[0].datum;
+    endDatum = letztesDatum === datum ? "" : letztesDatum;
+    ganztags = true;
+    startZeit = ""; endZeit = "";
+  } else {
+    datum = document.getElementById("tf-datum").value;
+    endDatum = document.getElementById("tf-enddatum").value;
+    const ganztagsChecked = document.getElementById("tf-ganztags").checked;
+    startZeit = ganztagsChecked ? "" : document.getElementById("tf-startzeit").value;
+    endZeit = ganztagsChecked ? "" : document.getElementById("tf-endzeit").value;
+
+    if (!ISO_RE.test(datum)) { alert("Bitte ein gültiges Datum wählen."); return; }
+    if (endDatum && !ISO_RE.test(endDatum)) { alert("Bitte ein gültiges Enddatum wählen."); return; }
+    if (endDatum && endDatum < datum) { alert("Das Enddatum darf nicht vor dem Datum liegen."); return; }
+    if (endDatum && endDatum <= datum) endDatum = ""; // gleich/kleiner => eintägig
+    ganztags = ganztagsChecked || (!startZeit && !endZeit);
+    if (!ganztags && startZeit && endZeit && !endDatum && endZeit <= startZeit) {
+      alert("Die Endzeit muss nach der Startzeit liegen."); return;
+    }
+  }
+
+  const btn = document.getElementById("btn-save-termin");
+  btn.disabled = true;
+  setSaveStatus("Speichern…", "pending");
+  try {
+    // Neue Dateien jetzt hochladen (Metadaten für die JSON einsammeln).
+    const anhaenge = [];
+    for (const a of pendingAnhaenge) {
+      if (a.neu) {
+        setSaveStatus("Datei wird hochgeladen…", "pending");
+        const meta = await gatewayUploadFile(a.file);
+        anhaenge.push(meta);
+      } else {
+        anhaenge.push({ id: a.id, name: a.name, mime: a.mime, size: a.size });
+      }
+    }
+
+    let t = editingTerminId ? appData.termine.find((x) => x.id === editingTerminId) : null;
+    const isNew = !t;
+    // Schnappschuss VOR den Feld-Mutationen unten (t ist dieselbe Objektreferenz
+    // wie in appData.termine, kein Klon) -- Grundlage für den Teilen-/Änderungs-
+    // Abgleich in notifyShareTargets() nach dem Speichern.
+    const before = t ? {
+      geteiltUsers: Array.isArray(t.geteiltUsers) ? t.geteiltUsers.slice() : [],
+      titel: t.titel, datum: t.datum, endDatum: t.endDatum,
+      ort: t.ort, startZeit: t.startZeit, endZeit: t.endZeit,
+      umfrage: umfrageSnapshot(t)
+    } : null;
+    if (!t) { t = { id: uuid() }; appData.termine.push(t); }
+    // vorhandene Felder ersetzen (undefined bewusst weglassen)
+    t.titel = titel;
+    t.kategorie = kategorie;
+    t.ort = ort || undefined;
+    t.datum = datum;
+    t.endDatum = endDatum || undefined;
+    t.ganztags = ganztags;
+    t.startZeit = ganztags ? undefined : (startZeit || undefined);
+    t.endZeit = ganztags ? undefined : (endZeit || undefined);
+    t.notiz = notiz || undefined;
+    t.anhaenge = anhaenge;
+    t.umfrage = umfrageAktiv ? { aktiv: true, termine: umfrageCandidates, stimmen: (t.umfrage && t.umfrage.stimmen) || {} } : undefined;
+    t.privat = privat || undefined;
+    const geteiltGruppen = Array.from(document.querySelectorAll(".tf-group-checkbox:checked")).map((el) => el.value);
+    t.geteiltUsers = (privat && pendingShareUsers.length) ? pendingShareUsers.map((u) => u.username) : undefined;
+    t.geteiltGruppen = (privat && geteiltGruppen.length) ? geteiltGruppen : undefined;
+    if (isNew) {
+      if (currentUser) t.ersteller = currentUser.username;
+      t.erstelltAm = new Date().toISOString();
+    }
+
+    // Entfernte bestehende Anhänge physisch löschen (best-effort).
+    for (const id of removedExistingIds) await gatewayDeleteFile(id);
+
+    await gatewaySaveWithStand();
+    // Best-effort, NACH erfolgreichem Speichern -- ein Mail-Fehler darf den schon
+    // gespeicherten Termin nie als "nicht gespeichert" erscheinen lassen.
+    try { await notifyShareTargets(t, before); } catch (e) { console.warn("Teilen-Benachrichtigung fehlgeschlagen", e); }
+    try { await pushOeffentlichenTermin(t, before); } catch (e) { console.warn("Termin-Benachrichtigung fehlgeschlagen", e); }
+    renderAll();
+    closeTerminModal();
+  } catch (e) {
+    if (e instanceof ConflictError) { await reloadAfterConflict(); }
+    else if (e instanceof NotLoggedInError) { showConnectScreen("Sitzung abgelaufen — bitte neu anmelden."); }
+    else { console.error("Speichern fehlgeschlagen", e); setSaveStatus("Nicht gespeichert", "error"); alert("Speichern fehlgeschlagen: " + e.message); }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- Private Termine: E-Mail-Hinweis bei (erstmaligem) Teilen oder Änderung ----------
+// Trigger: Nutzer NEU in geteiltUsers ("geteilt") ODER bereits geteilt UND
+// sichtbarer Inhalt hat sich geändert ("geändert"). Kein Hinweis beim Entfernen
+// aus geteiltUsers oder wenn der Termin gar nicht (mehr) privat ist. Adresse wird
+// serverseitig über den Nutzernamen aufgelöst (Aktion "notify-user", siehe
+// admin-worker.js) -- diese App kennt selbst keine E-Mail-Adressen.
+// Vergleichbare Kurzform aller Terminvorschläge (Datum + Uhrzeiten, in Reihenfolge).
+// Damit zählt auch eine nachträglich geänderte Vorschlagszeit als inhaltliche
+// Änderung -- ohne das käme bei einer reinen Uhrzeit-Korrektur keine Mail heraus,
+// weil t.datum/t.startZeit bei Umfragen unverändert bleiben.
+function umfrageSnapshot(t) {
+  return terminIsUmfrage(t) ? t.umfrage.termine.map(umfrageCandKey).join(";") : "";
+}
+
+// Gemeinsam genutzt von notifyShareTargets (private Termine, Mail+Push an die
+// Geteilten) und pushOeffentlichenTermin (alle uebrigen, Push an alle) --
+// bewusst EINE Funktion: zwei Kopien derselben Vergleichsliste laufen
+// auseinander, sobald ein Feld dazukommt, und dann meldet sich der eine Weg bei
+// einer Aenderung und der andere nicht.
+function terminInhaltGeaendert(t, before) {
+  return !!before && (
+    before.titel !== t.titel || before.datum !== t.datum || before.endDatum !== t.endDatum ||
+    before.ort !== t.ort || before.startZeit !== t.startZeit || before.endZeit !== t.endZeit ||
+    before.umfrage !== umfrageSnapshot(t)
+  );
+}
+
+async function notifyShareTargets(t, before) {
+  if (!t.privat) return;
+  const now = Array.isArray(t.geteiltUsers) ? t.geteiltUsers : [];
+  const prev = before ? before.geteiltUsers : [];
+  const neu = now.filter((u) => !prev.includes(u));
+  const bestehend = now.filter((u) => prev.includes(u));
+  if (!neu.length && !bestehend.length) return;
+
+  const inhaltGeaendert = terminInhaltGeaendert(t, before);
+
+  const von = (currentUser && currentUser.vorname && currentUser.nachname)
+    ? `${currentUser.vorname} ${currentUser.nachname}` : "Jemand";
+  const link = "https://sc1911heiligenstadt.github.io/vereinskalender/";
+
+  const sende = async (username, subject, message) => {
+    try {
+      await gatewayRequest({ action: "notify-user", username, subject, message });
+    } catch (e) {
+      console.warn("Benachrichtigung fehlgeschlagen für", username, e);
+    }
+  };
+
+  // Eckdaten des Termins fuer den Mailtext. Seit 2026-08-19 (Michel-Wunsch:
+  // ausfuehrlicher) steht hier eine richtige Mail statt eines Einzeilers -- wer
+  // sie liest, weiss ohne die App zu oeffnen, worum es geht und wann es ist.
+  //
+  // ⚠️ Die NOTIZ bleibt bewusst draussen. Titel, Tag und Ort braucht man, um den
+  // Termin einordnen zu koennen; die Notiz ist der Ort fuer Einzelheiten und hat
+  // in einem Postfach nichts verloren, das der Verein nicht kontrolliert. Fuer
+  // den Push gilt dieselbe Linie eine Stufe schaerfer (dort fehlt auch der Titel).
+  const eckdaten = () => {
+    const z = [];
+    if (terminIsUmfrage(t)) {
+      z.push("", "Ein fester Tag steht noch nicht fest. Zur Auswahl stehen:", "");
+      for (const c of t.umfrage.termine) {
+        const zeit = umfrageZeitLabel(c);
+        z.push("  • " + fmtDate(c.datum) + (zeit ? ", " + zeit : ""));
+      }
+      z.push("", "Bitte stimme im Vereinskalender ab, wann es dir passt — direkt auf der",
+        "Terminkarte, das dauert einen Klick.");
+    } else {
+      z.push("Wann:    " + terminDatumLabel(t) + ", " + terminZeitLabel(t));
+      if (t.ort) z.push("Wo:      " + t.ort);
+    }
+    return z;
+  };
+
+  const brief = (einleitung, schluss) => [
+    "Hallo,", "", einleitung, "",
+    "Termin:  " + t.titel,
+    ...eckdaten(),
+    "", schluss, "",
+    "Zum Vereinskalender: " + link, "",
+    "Den Termin sehen nur die Personen, mit denen er geteilt wurde — er steht nicht",
+    "im öffentlichen Kalender des Vereins.", "",
+    "Diese Nachricht wurde automatisch verschickt."
+  ].join("\n");
+
+  for (const u of neu) {
+    await sende(u, "Neuer privater Termin im Vereinskalender", brief(
+      `${von} hat einen privaten Termin mit dir geteilt.`,
+      "Weitere Einzelheiten und eventuelle Anhänge findest du im Vereinskalender."));
+  }
+  if (inhaltGeaendert) {
+    for (const u of bestehend) {
+      await sende(u, "Privater Termin geändert: " + t.titel, brief(
+        `${von} hat einen mit dir geteilten privaten Termin geändert. Hier der neue Stand:`,
+        "Bitte prüfe im Vereinskalender, ob der Termin so für dich passt."));
+    }
+  }
+}
+
+// ---------- Nicht-private Termine: Push an alle (seit 2026-08-03) ----------
+// Michel-Vorgabe: "nicht nur Private, sondern wirklich jeder Termin". Der
+// Empfaengerkreis wird SERVERSEITIG bestimmt (alle Personalkonten ausser dem
+// Ausloeser, keine Spielerkonten) -- diese App kennt den Nutzerbestand gar
+// nicht, und 200 Einzelaufrufe wie beim Mail-Weg waeren hier absurd.
+//
+// ⚠️ Nur fuer NICHT-private Termine. Private laufen weiter ueber
+// notifyShareTargets: dort gibt es Mail und Push, aber ausschliesslich an die
+// tatsaechlich Geteilten. Ohne diese Trennung bekaeme ein privater Termin
+// beides doppelt -- und zusaetzlich Leute, die ihn nicht sehen duerfen.
+//
+// ⚠️ Es geht KEINE Mail mit. Ein oeffentlicher Termin an die ganze Belegschaft
+// waere ein Rundschreiben, und dafuer ist der Kalender nicht da.
+async function pushOeffentlichenTermin(t, before) {
+  if (t.privat) return;
+  // Beim Bearbeiten nur melden, wenn sich sichtbar etwas geaendert hat. Wer
+  // eine Notiz korrigiert oder einen Anhang tauscht, loest nichts aus.
+  if (before && !terminInhaltGeaendert(t, before)) return;
+  try {
+    await gatewayRequest({
+      action: "vereinskalender-termin-push",
+      art: before ? "geaendert" : "neu"
+    });
+  } catch (e) {
+    // Best-effort wie beim Mail-Weg: der Termin ist zu diesem Zeitpunkt
+    // gespeichert, eine misslungene Benachrichtigung darf ihn nicht als
+    // "nicht gespeichert" erscheinen lassen.
+    console.warn("Termin-Benachrichtigung fehlgeschlagen", e);
+  }
+}
+
+// ---------- Umfrage: Abstimmen direkt auf der Terminkarte ----------
+// Bei Konflikt (409) wird der eigene Stimmversuch NICHT mit dem lauten
+// reloadAfterConflict()-Hinweis verworfen (Abstimm-Kollisionen sind bei mehreren
+// gleichzeitigen Wählern erwartbar), sondern still einmal auf dem frisch
+// geladenen Stand wiederholt.
+// Abstimmen läuft über die eigene Gateway-Aktion (gatewayVote in db.js), NICHT
+// über das Speichern des ganzen Dokuments: Termine schreiben ist serverseitig den
+// Bearbeitern vorbehalten, während abstimmen darf, wer den Termin sieht. Über
+// dav-save bekam deshalb genau die eingeladene Mehrheit ein 403 statt einer
+// Stimme. Konflikte löst der Worker selbst (frisch lesen, nur das eigene Feld
+// setzen) — hier braucht es keine Wiederholung mehr.
+async function castVote(terminId, candId, val) {
+  if (!currentUser) return;
+  const t = appData.termine.find((x) => x.id === terminId);
+  if (!t || !terminIsUmfrage(t)) return;
+  if (!t.umfrage.stimmen || typeof t.umfrage.stimmen !== "object") t.umfrage.stimmen = {};
+
+  const vorher = t.umfrage.stimmen;
+  const eigene = (vorher[currentUser.username] && typeof vorher[currentUser.username] === "object")
+    ? vorher[currentUser.username] : {};
+  const wert = (eigene[candId] === val) ? "" : val; // zweiter Klick auf denselben Knopf zieht die Stimme zurück
+
+  // Optimistisch anzeigen, damit der Klick sofort wirkt; schlägt der Aufruf fehl,
+  // wird exakt der vorherige Stand wiederhergestellt.
+  const eigeneNeu = Object.assign({}, eigene);
+  if (wert) eigeneNeu[candId] = wert; else delete eigeneNeu[candId];
+  t.umfrage.stimmen = Object.assign({}, vorher, { [currentUser.username]: eigeneNeu });
+  renderTermine();
+
+  try {
+    const stimmen = await gatewayVote(terminId, candId, wert);
+    if (stimmen) t.umfrage.stimmen = stimmen; // Serverstand inkl. zwischenzeitlich fremder Stimmen
+    renderTermine();
+    const time = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    setSaveStatus("Gespeichert " + time, "ok");
+  } catch (e) {
+    t.umfrage.stimmen = vorher;
+    renderTermine();
+    if (e instanceof NotLoggedInError) { showConnectScreen("Sitzung abgelaufen — bitte neu anmelden."); return; }
+    console.error("Abstimmen fehlgeschlagen", e);
+    setSaveStatus("Nicht gespeichert", "error");
+    alert("Deine Stimme konnte nicht gespeichert werden: " + e.message);
+  }
+}
+
+async function deleteTermin() {
+  if (!editingTerminId) return;
+  if (!confirm("Diesen Termin wirklich löschen?")) return;
+  const t = appData.termine.find((x) => x.id === editingTerminId);
+  setSaveStatus("Löschen…", "pending");
+  try {
+    for (const a of (t && t.anhaenge ? t.anhaenge : [])) await gatewayDeleteFile(a.id);
+    appData.termine = appData.termine.filter((x) => x.id !== editingTerminId);
+    await gatewaySaveWithStand();
+    renderAll();
+    closeTerminModal();
+  } catch (e) {
+    if (e instanceof ConflictError) { await reloadAfterConflict(); }
+    else { console.error("Löschen fehlgeschlagen", e); setSaveStatus("Nicht gespeichert", "error"); alert("Löschen fehlgeschlagen: " + e.message); }
+  }
+}
+
+// ---------- Vergangene Termine automatisch aufräumen (nur Bearbeiter) ----------
+async function purgePastEvents() {
+  if (!canEdit()) return;
+  const past = appData.termine.filter(isPast);
+  if (past.length === 0) return;
+  for (const t of past) {
+    for (const a of (t.anhaenge || [])) await gatewayDeleteFile(a.id);
+  }
+  appData.termine = appData.termine.filter((t) => !isPast(t));
+  try {
+    await gatewaySaveWithStand();
+  } catch (e) {
+    console.warn("Aufräumen vergangener Termine konnte nicht gespeichert werden", e);
+  }
+}
+
+// ---------- Anhang ansehen (neuer Tab, kein erzwungener Download) ----------
+async function viewAnhang(id, mime) {
+  // Leeres Fenster SOFORT (synchron im Klick-Handler) öffnen, sonst greift in
+  // manchen Browsern der Popup-Blocker, weil der eigentliche Fetch erst nach
+  // einem await zurückkommt und damit nicht mehr als direkte Nutzeraktion zählt.
+  const win = window.open("", "_blank");
+  try {
+    const rawBlob = await gatewayFetchFileBlob(id);
+    // Der Content-Type der dav-file-get-Antwort ist bei erweiterungslos
+    // gespeicherten Dateien nicht verlässlich (siehe ToolsUebersicht-Gotcha) —
+    // die selbst gespeicherten Anhang-Metadaten (mime) verwenden statt blob.type
+    // zu vertrauen, sonst zeigt der Browser z. B. ein Bild nicht an, sondern
+    // bietet es zum Download an.
+    const blob = mime ? new Blob([rawBlob], { type: mime }) : rawBlob;
+    const url = URL.createObjectURL(blob);
+    if (win) win.location.href = url; else window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    console.error("Datei konnte nicht geöffnet werden", e);
+    if (win) win.close();
+    alert("Die Datei konnte nicht geöffnet werden: " + e.message);
+  }
+}
+
+// ---------- Kategorien-Verwaltung (Einstellungen-Tab) ----------
+function renderKategorien() {
+  const el = document.getElementById("kategorie-list");
+  if (!el) return;
+  el.innerHTML = appData.kategorien.map((k) => `
+    <div class="kategorie-row" data-id="${escapeHtml(k.id)}">
+      <input type="color" class="kat-farbe-input" data-id="${escapeHtml(k.id)}" value="${escapeHtml(k.farbe)}" title="Farbe" />
+      <input type="text" class="kat-name-input" data-id="${escapeHtml(k.id)}" value="${escapeHtml(k.name)}" maxlength="60" />
+      <button type="button" class="kategorie-remove" data-id="${escapeHtml(k.id)}" aria-label="Kategorie löschen">×</button>
+    </div>
+  `).join("");
+}
+
+async function saveKategorien() {
+  setSaveStatus("Speichern…", "pending");
+  try {
+    await gatewaySaveWithStand();
+    renderAll();
+  } catch (e) {
+    if (e instanceof ConflictError) { await reloadAfterConflict(); }
+    else if (e instanceof NotLoggedInError) { showConnectScreen("Sitzung abgelaufen — bitte neu anmelden."); }
+    else { console.error("Speichern fehlgeschlagen", e); setSaveStatus("Nicht gespeichert", "error"); alert("Speichern fehlgeschlagen: " + e.message); }
+  }
+}
+
+async function addKategorie() {
+  const nameInput = document.getElementById("neue-kategorie-name");
+  const farbeInput = document.getElementById("neue-kategorie-farbe");
+  const name = nameInput.value.trim();
+  if (!name) { alert("Bitte einen Namen für die Kategorie eingeben."); return; }
+  appData.kategorien.push({ id: uuid(), name, farbe: farbeInput.value });
+  nameInput.value = "";
+  farbeInput.value = "#6b7280";
+  await saveKategorien();
+}
+
+async function onKategorieFieldChange(e) {
+  const id = e.target.dataset.id;
+  const k = id ? kategorieById(id) : null;
+  if (!k) return;
+  if (e.target.classList.contains("kat-name-input")) {
+    const name = e.target.value.trim();
+    if (!name) { e.target.value = k.name; return; }
+    k.name = name;
+  } else if (e.target.classList.contains("kat-farbe-input")) {
+    k.farbe = e.target.value;
+  } else {
+    return;
+  }
+  await saveKategorien();
+}
+
+async function onKategorieListClick(e) {
+  const btn = e.target.closest(".kategorie-remove");
+  if (!btn) return;
+  const k = kategorieById(btn.dataset.id);
+  if (!k) return;
+  const used = appData.termine.filter((t) => t.kategorie === k.id).length;
+  const hinweis = used > 0 ? ` Sie wird aktuell bei ${used} Termin${used === 1 ? "" : "en"} verwendet (diese zeigen danach keine Kategorie mehr an).` : "";
+  if (!confirm(`Kategorie "${k.name}" wirklich löschen?${hinweis}`)) return;
+  appData.kategorien = appData.kategorien.filter((x) => x.id !== k.id);
+  await saveKategorien();
+}
+
+// ---------- Gateway: Speichern / Konflikte ----------
+function setSaveStatus(text, kind) {
+  const el = document.getElementById("save-status");
+  if (!el) return;
+  el.textContent = text;
+  el.className = "header-status" + (kind ? " is-" + kind : "");
+}
+
+// Es darf immer nur EIN dav-save unterwegs sein. gatewayRev (das ETag, mit dem der
+// Worker Konflikte erkennt) wird erst aktualisiert, wenn ein Save zurückkommt —
+// ein zweiter Save, der währenddessen startet, schickt also dasselbe, inzwischen
+// veraltete ETag und wird zwangsläufig mit 409 abgelehnt. Für die bearbeitende
+// Person sah das aus wie "ein anderes Gerät hat geändert", obwohl sie allein war,
+// und reloadAfterConflict() verwarf dabei ihre letzte Eingabe. Beim zügigen
+// Abstimmen auf einer Umfragekarte (jeder Klick speichert sofort) oder beim
+// Ziehen im Kategorie-Farbwähler passierte das mehrfach hintereinander, weil die
+// WebDAV-Runde deutlich länger dauert als der Abstand zwischen zwei Klicks.
+// Deshalb: Änderungen, die während eines laufenden Saves anfallen, nur vormerken
+// und danach in einem Rutsch nachschreiben. appData wird ohnehin immer komplett
+// geschrieben, es geht also nichts verloren, wenn mehrere Änderungen zusammenfallen.
+// Fehler werden weiterhin an die Aufrufer geworfen — die ConflictError-/
+// NotLoggedInError-Behandlung liegt dort und bleibt unverändert.
+let saveRunner = null;
+let saveDirty = false;
+// Für das Sicherheitsnetz beim Verlassen der Seite (beforeunload unten).
+let ungespeicherteAenderungen = false;
+let letzterSaveFehlgeschlagen = false;
+function gatewaySaveWithStand() {
+  saveDirty = true;
+  ungespeicherteAenderungen = true;
+  if (!saveRunner) saveRunner = runSaveLoop().finally(() => { saveRunner = null; });
+  return saveRunner;
+}
+async function runSaveLoop() {
+  while (saveDirty) {
+    saveDirty = false;
+    try {
+      await writeToGateway();
+    } catch (e) {
+      // Bei Konflikt/Fehler lädt der Aufrufer den Stand neu bzw. zeigt den
+      // Login-Screen — dann NICHT blind nachschreiben, das würde den fremden
+      // Stand wieder überbügeln.
+      saveDirty = false;
+      letzterSaveFehlgeschlagen = true;
+      throw e;
+    }
+  }
+  ungespeicherteAenderungen = false;
+  letzterSaveFehlgeschlagen = false;
+}
+
+// Sicherheitsnetz beim Verlassen der Seite: ein laufender fetch wird beim
+// Entladen abgebrochen, der keepalive-Request überlebt das Schließen des Tabs.
+// Nachgefragt wird NUR, wenn dieser Weg nicht trägt (über 64 KB, kein Token,
+// oder der letzte reguläre Versuch schlug schon fehl) — sonst käme die
+// Rückfrage bei jedem Schließen kurz nach einer Änderung.
+window.addEventListener("beforeunload", (e) => {
+  if (!ungespeicherteAenderungen) return;
+  const abgeschickt = gatewaySaveBeacon(appData);
+  if (abgeschickt && !letzterSaveFehlgeschlagen) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+async function writeToGateway() {
+  appData.meta = Object.assign({}, appData.meta, { stand: new Date().toISOString() });
+  await gatewaySave(appData);
+  const time = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  setSaveStatus("Gespeichert " + time, "ok");
+}
+
+async function reloadAfterConflict() {
+  try {
+    const data = await gatewayLoad();
+    appData = normalizeData(data);
+    renderAll();
+    setSaveStatus("Von anderem Gerät aktualisiert", "");
+    alert("Die Daten wurden zwischenzeitlich auf einem anderen Gerät geändert — die aktuelle Version wurde neu geladen. Bitte die letzte Änderung bei Bedarf erneut vornehmen.");
+  } catch (e) {
+    console.error("Neuladen nach Konflikt fehlgeschlagen", e);
+  }
+  closeTerminModal();
+}
+
+// ---------- Start ----------
+// ---------- Sitzungsverlust: räumen, nicht nur verstecken ----------
+
+// ⚠️ Verstecken ist nicht Räumen. Fällt die Sitzung weg, WÄHREND die App
+// offen ist, steht bereits alles auf dem Bildschirm. display:none macht das
+// unsichtbar, nicht weg -- Namen, Nummern und ausgefüllte Formularfelder sind
+// im Seitenquelltext weiter lesbar.
+//
+// ⚠️ Über die CONTAINER räumen, nie über eine Id-Liste. Eine Liste veraltet
+// lautlos: wer später ein Feld ergänzt, müsste daran denken, und genau das eine
+// bliebe stehen.
+//
+// ⚠️ Dialoge, Druckbereich und Bild-Lightbox stehen NEBEN der Hülle, nicht
+// darin -- ihr innerHTML erwischt sie nicht. Ein offener Dialog ist dabei der
+// schlimmste Fall: er steht nicht nur gespeichert, sondern SICHTBAR da.
+//
+// ⚠️ #header-user steht in einigen Apps im Seitenkopf und damit ebenfalls
+// außerhalb. Der Rest des Kopfes (Titel, Logo, Zurück-Link) bleibt absichtlich:
+// ohne ihn stünde man vor einer weißen Seite ohne Weg zurück.
+//
+// Wegwerfen ist gefahrlos: zurück in die App geht es ausschließlich über ein
+// Neuladen der Seite. Wer sich neu anmeldet, bekommt sie ohnehin frisch.
+let bildschirmGeraeumt = false;
+
+// Vor dem ersten Aufbau gibt es nichts zu räumen -- und wer gar nicht angemeldet
+// ist, soll nicht "Sitzung abgelaufen" lesen. Gesetzt wird das erst, wenn die
+// Hülle wirklich sichtbar wird.
+let appLaeuft = false;
+
+function raeumeBildschirm() {
+  bildschirmGeraeumt = true;
+  const huelle = document.getElementById("app-shell");
+  if (huelle) huelle.innerHTML = "";
+  document.querySelectorAll(".modal-overlay, .overlay, #print-area, .foto-lightbox, #header-user").forEach((el) => {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    el.style.display = "none";
+  });
+}
+
+// ⚠️ Gerufen aus db.js -- an der EINEN Stelle, an der die 401 ankommt. Sonst
+// müsste jeder einzelne Fehlerweg daran denken, und einer vergisst es.
+function raeumeBeiSitzungsverlust() {
+  if (!appLaeuft) return;
+  showConnectScreen("Die Sitzung ist abgelaufen. Bitte über die Tools-Übersicht neu anmelden.");
+}
+
+function showConnectScreen(errorMsg) {
+  raeumeBildschirm();
+  document.getElementById("connect-screen").style.display = "";
+  document.getElementById("app-shell").style.display = "none";
+  document.getElementById("cloud-error").textContent = errorMsg ? "Fehler: " + errorMsg : "";
+}
+
+async function startApp() {
+  appLaeuft = true;
+  document.getElementById("connect-screen").style.display = "none";
+  document.getElementById("app-shell").style.display = "";
+  try { currentUser = await fetchMe(); } catch (_) { /* best effort */ }
+  renderHeaderUser();
+  applyAdminVisibility();
+  renderVersionInfo();
+  // Für "Angelegt von <Name>"-Anzeige auf den Karten — auch für Nicht-Bearbeiter,
+  // damit Namen (statt nur Nutzernamen) direkt beim ersten Rendern verfügbar sind.
+  await ensureDirectoryLoaded();
+  await purgePastEvents();
+  renderAll();
+}
+
+async function init() {
+  setupListeners();
+  if (!getSessionToken()) { showConnectScreen(); return; }
+  try {
+    const data = await gatewayLoad();
+    appData = normalizeData(data);
+    await startApp();
+  } catch (e) {
+    if (e instanceof NotLoggedInError) { showConnectScreen(); return; }
+    console.error("Nextcloud-Zugriff über Login fehlgeschlagen", e);
+    showConnectScreen(e.message);
+  }
+}
+
+function setupListeners() {
+  document.querySelectorAll("nav button[data-tab]").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+  document.getElementById("btn-new-termin").addEventListener("click", () => openTerminModal(null));
+
+  // Abo-Link im Info-Tab
+  document.getElementById("btn-abo-anlegen").addEventListener("click", aboAnlegen);
+  document.getElementById("btn-abo-neu").addEventListener("click", aboNeuErzeugen);
+  document.getElementById("btn-abo-loeschen").addEventListener("click", aboLoeschen);
+  document.getElementById("btn-abo-kopieren").addEventListener("click", aboKopieren);
+
+  // Termin-Karte antippen -> bearbeiten (nur Bearbeiter).
+  document.getElementById("hero").addEventListener("click", onCardClick);
+  document.getElementById("termin-list").addEventListener("click", onCardClick);
+
+  document.getElementById("termin-modal-close").addEventListener("click", closeTerminModal);
+  document.getElementById("btn-cancel-termin").addEventListener("click", closeTerminModal);
+  document.getElementById("btn-save-termin").addEventListener("click", saveTermin);
+  document.getElementById("btn-delete-termin").addEventListener("click", deleteTermin);
+  document.getElementById("termin-modal").addEventListener("click", (e) => { if (e.target.id === "termin-modal") closeTerminModal(); });
+  document.getElementById("termin-form").addEventListener("submit", (e) => { e.preventDefault(); saveTermin(); });
+  document.getElementById("tf-ganztags").addEventListener("change", updateFormModeUi);
+  document.getElementById("tf-umfrage").addEventListener("change", updateFormModeUi);
+  document.getElementById("tf-privat").addEventListener("change", updateFormModeUi);
+
+  // Umfrage-Terminvorschläge im Formular
+  document.getElementById("btn-add-umfrage-termin").addEventListener("click", addUmfrageTermin);
+  document.getElementById("tf-umfrage-termine").addEventListener("input", onUmfrageListInput);
+  document.getElementById("tf-umfrage-termine").addEventListener("click", onUmfrageListClick);
+
+  // Teilen mit Nutzern/Gruppen im Formular
+  document.getElementById("tf-user-search").addEventListener("input", onUserSearchInput);
+  document.getElementById("tf-user-results").addEventListener("click", onUserResultClick);
+  document.getElementById("tf-user-chips").addEventListener("click", onShareChipsClick);
+
+  // Anhänge im Formular
+  document.getElementById("btn-add-anhang").addEventListener("click", () => document.getElementById("anhang-file-input").click());
+  document.getElementById("anhang-file-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) { alert("Datei ist zu groß (max. " + Math.round(MAX_FILE_BYTES / 1024 / 1024) + " MB)."); return; }
+    pendingAnhaenge.push({ file, name: file.name, mime: file.type || "application/octet-stream", size: file.size, neu: true });
+    renderAnhangEditList();
+  });
+  document.getElementById("tf-anhaenge").addEventListener("click", (e) => {
+    const btn = e.target.closest(".anhang-remove");
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx, 10);
+    const a = pendingAnhaenge[idx];
+    if (a && a.existing) removedExistingIds.push(a.id);
+    pendingAnhaenge.splice(idx, 1);
+    renderAnhangEditList();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("termin-modal").classList.contains("hidden")) closeTerminModal();
+  });
+
+  // Kategorien-Verwaltung (Einstellungen-Tab)
+  document.getElementById("btn-kategorie-add").addEventListener("click", addKategorie);
+  document.getElementById("kategorie-list").addEventListener("change", onKategorieFieldChange);
+  document.getElementById("kategorie-list").addEventListener("click", onKategorieListClick);
+}
+
+function onCardClick(e) {
+  const detailsBtn = e.target.closest(".umfrage-details-toggle");
+  if (detailsBtn) { toggleUmfrageDetails(detailsBtn.dataset.terminId, detailsBtn.dataset.candId, detailsBtn.closest(".umfrage-row")); return; }
+  const vote = e.target.closest(".umfrage-vote");
+  if (vote) { castVote(vote.dataset.terminId, vote.dataset.candId, vote.dataset.val); return; }
+  const anhang = e.target.closest(".anhang");
+  if (anhang) { viewAnhang(anhang.dataset.fileId, anhang.dataset.mime); return; }
+  const card = e.target.closest(".termin-card");
+  if (card && canEdit()) openTerminModal(card.dataset.id);
+}
+
+document.addEventListener("DOMContentLoaded", init);
