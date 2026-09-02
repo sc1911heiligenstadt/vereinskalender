@@ -27,6 +27,15 @@ mit ganzen Gruppen; die Beteiligten bekommen eine **E-Mail** mit Titel, Tag,
 Uhrzeit und Ort — beim ersten Teilen und bei späteren Änderungen. Die Notiz
 bleibt bewusst draußen und steht weiterhin nur in der App.
 
+## Nachrichten sammeln sich zehn Minuten
+
+E-Mail und Push gehen nicht sofort beim Speichern raus, sondern **zehn Minuten
+nach der letzten Änderung**. Wer einen Termin anlegt und ihn gleich danach noch
+nachbessert, löst damit nur eine Nachricht aus statt einer je Speichern — und
+verschickt wird immer der Stand von zuletzt, nicht der vom Anfang. Wird der
+Termin in dieser Zeit wieder gelöscht oder jemand wieder ausgetragen, geht
+dafür gar nichts mehr raus.
+
 ## Terminumfragen
 
 Statt eines festen Datums lassen sich mehrere **Vorschläge** eintragen, jeder mit
@@ -59,9 +68,10 @@ erzeugen, und mit dem Konto oder dem Zugang zum Kalender erlischt er sofort.
 
 Wird ein Termin angelegt oder inhaltlich geändert (Titel, Datum, Ort, Uhrzeit,
 Umfrage-Vorschläge), bekommt das Personal eine Push-Nachricht — sofern in der
-Tools-Übersicht unter *Mein Konto* eingeschaltet. Die Nachricht nennt weder Titel
-noch Ort, weil sie auf dem Sperrbildschirm steht. Spielerkonten werden nicht
-benachrichtigt, und an alle geht nie eine E-Mail.
+Tools-Übersicht unter *Mein Konto* eingeschaltet. Sie wartet dieselben zehn
+Minuten wie die E-Mail. Die Nachricht nennt weder Titel noch Ort, weil sie auf
+dem Sperrbildschirm steht. Spielerkonten werden nicht benachrichtigt, und an
+alle geht nie eine E-Mail.
 
 ## Zugang
 

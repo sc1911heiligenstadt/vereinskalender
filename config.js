@@ -16,6 +16,20 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.2",
+    groups: [
+      {
+        title: "Benachrichtigungen sammeln sich zehn Minuten",
+        items: [
+          "Mail und Handy-Nachricht gehen nicht mehr sofort beim Speichern raus, sondern erst zehn Minuten nach der letzten Änderung. Wer einen Termin anlegt und ihn gleich danach noch nachbessert, löst damit nur noch eine Nachricht aus statt einer je Speichern.",
+          "Verschickt wird immer der Stand von zuletzt — nicht der, bei dem die Uhr angefangen hat zu laufen. Eine Korrektur an Titel, Tag, Uhrzeit oder Ort steht also schon in der ersten Mail, die jemand bekommt.",
+          "Wird ein Termin innerhalb der zehn Minuten wieder gelöscht oder jemand wieder ausgetragen, geht dafür gar keine Nachricht mehr raus.",
+          "Ein Hinweis im Termin-Fenster sagt das jetzt dazu, damit die ausbleibende Mail nicht wie ein Fehler wirkt."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.1",
     groups: [
       {

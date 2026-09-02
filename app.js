@@ -845,7 +845,7 @@ async function saveTermin() {
     const isNew = !t;
     // Schnappschuss VOR den Feld-Mutationen unten (t ist dieselbe Objektreferenz
     // wie in appData.termine, kein Klon) -- Grundlage für den Teilen-/Änderungs-
-    // Abgleich in notifyShareTargets() nach dem Speichern.
+    // Abgleich in planeBenachrichtigung() nach dem Speichern.
     const before = t ? {
       geteiltUsers: Array.isArray(t.geteiltUsers) ? t.geteiltUsers.slice() : [],
       titel: t.titel, datum: t.datum, endDatum: t.endDatum,
@@ -880,8 +880,7 @@ async function saveTermin() {
     await gatewaySaveWithStand();
     // Best-effort, NACH erfolgreichem Speichern -- ein Mail-Fehler darf den schon
     // gespeicherten Termin nie als "nicht gespeichert" erscheinen lassen.
-    try { await notifyShareTargets(t, before); } catch (e) { console.warn("Teilen-Benachrichtigung fehlgeschlagen", e); }
-    try { await pushOeffentlichenTermin(t, before); } catch (e) { console.warn("Termin-Benachrichtigung fehlgeschlagen", e); }
+    try { await planeBenachrichtigung(t, before); } catch (e) { console.warn("Benachrichtigung konnte nicht geplant werden", e); }
     renderAll();
     closeTerminModal();
   } catch (e) {
@@ -893,12 +892,29 @@ async function saveTermin() {
   }
 }
 
-// ---------- Private Termine: E-Mail-Hinweis bei (erstmaligem) Teilen oder Änderung ----------
-// Trigger: Nutzer NEU in geteiltUsers ("geteilt") ODER bereits geteilt UND
-// sichtbarer Inhalt hat sich geändert ("geändert"). Kein Hinweis beim Entfernen
-// aus geteiltUsers oder wenn der Termin gar nicht (mehr) privat ist. Adresse wird
-// serverseitig über den Nutzernamen aufgelöst (Aktion "notify-user", siehe
-// admin-worker.js) -- diese App kennt selbst keine E-Mail-Adressen.
+// ---------- Benachrichtigungen: in den Postausgang, nicht sofort raus ----------
+// Michel-Wunsch vom 2026-09-02: eine Nachricht kommt erst 10 Minuten nach der
+// letzten Änderung. Wer einen Termin anlegt und ihn gleich danach noch dreimal
+// nachbessert, löste bis dahin drei Benachrichtigungen aus — zwei davon mit
+// einem Stand, den es schon nicht mehr gibt.
+//
+// ⚠️ DIESE APP SCHREIBT DEN MAILTEXT NICHT MEHR. Er entsteht erst beim Versand
+// im Worker (vkPostBrief in admin-worker.js), weil nur der den Termin zum
+// Zeitpunkt des Versands kennt. Würde der Brief hier gebaut und nur der Versand
+// wanderte nach hinten, käme zehn Minuten später der ALTE Zwischenstand an —
+// die Verzögerung hätte nichts gebracht außer Wartezeit. Wer die Formulierung
+// ändern will, ändert sie DORT.
+//
+// Was hier bleibt, ist die Frage "gibt es überhaupt etwas zu melden, und wem":
+// die Antwort hängt am Vergleich mit dem Zustand VOR dem Speichern, und den hat
+// nur diese Seite.
+//
+// ⚠️ Die beiden Wege (privat: Mail+Push an die Geteilten / nicht privat: Push an
+// alle) sind unverändert und dürfen sich weiterhin nicht überschneiden — die
+// Weiche steht jetzt nur im Worker, der sie am AKTUELLEN Stand des Termins
+// stellt. Wer den Privat-Haken im Wartefenster umlegt, bekommt deshalb den Weg,
+// der zum Termin passt, wie er am Ende dasteht.
+
 // Vergleichbare Kurzform aller Terminvorschläge (Datum + Uhrzeiten, in Reihenfolge).
 // Damit zählt auch eine nachträglich geänderte Vorschlagszeit als inhaltliche
 // Änderung -- ohne das käme bei einer reinen Uhrzeit-Korrektur keine Mail heraus,
@@ -907,11 +923,9 @@ function umfrageSnapshot(t) {
   return terminIsUmfrage(t) ? t.umfrage.termine.map(umfrageCandKey).join(";") : "";
 }
 
-// Gemeinsam genutzt von notifyShareTargets (private Termine, Mail+Push an die
-// Geteilten) und pushOeffentlichenTermin (alle uebrigen, Push an alle) --
-// bewusst EINE Funktion: zwei Kopien derselben Vergleichsliste laufen
-// auseinander, sobald ein Feld dazukommt, und dann meldet sich der eine Weg bei
-// einer Aenderung und der andere nicht.
+// Gemeinsam genutzt für beide Wege -- bewusst EINE Funktion: zwei Kopien
+// derselben Vergleichsliste laufen auseinander, sobald ein Feld dazukommt, und
+// dann meldet sich der eine Weg bei einer Aenderung und der andere nicht.
 function terminInhaltGeaendert(t, before) {
   return !!before && (
     before.titel !== t.titel || before.datum !== t.datum || before.endDatum !== t.endDatum ||
@@ -920,107 +934,40 @@ function terminInhaltGeaendert(t, before) {
   );
 }
 
-async function notifyShareTargets(t, before) {
-  if (!t.privat) return;
-  const now = Array.isArray(t.geteiltUsers) ? t.geteiltUsers : [];
-  const prev = before ? before.geteiltUsers : [];
-  const neu = now.filter((u) => !prev.includes(u));
-  const bestehend = now.filter((u) => prev.includes(u));
-  if (!neu.length && !bestehend.length) return;
-
+// Legt den Anlass in den Postausgang -- oder gar nichts, wenn es nichts zu
+// melden gibt. Kein Hinweis beim Entfernen aus geteiltUsers, keiner, wenn nur
+// Notiz, Kategorie oder ein Anhang angefasst wurden.
+//
+// ⚠️ Ein Aufruf, der nichts zu melden hat, wird NICHT abgeschickt. Der Worker
+// setzt bei jedem Aufruf die Uhr neu; eine Notizkorrektur würde sonst eine
+// bereits wartende Mail um weitere zehn Minuten verschieben.
+async function planeBenachrichtigung(t, before) {
+  let neu = [];
+  let bestehend = [];
   const inhaltGeaendert = terminInhaltGeaendert(t, before);
 
-  const von = (currentUser && currentUser.vorname && currentUser.nachname)
-    ? `${currentUser.vorname} ${currentUser.nachname}` : "Jemand";
-  const link = "https://sc1911heiligenstadt.github.io/vereinskalender/";
-
-  const sende = async (username, subject, message) => {
-    try {
-      await gatewayRequest({ action: "notify-user", username, subject, message });
-    } catch (e) {
-      console.warn("Benachrichtigung fehlgeschlagen für", username, e);
-    }
-  };
-
-  // Eckdaten des Termins fuer den Mailtext. Seit 2026-08-19 (Michel-Wunsch:
-  // ausfuehrlicher) steht hier eine richtige Mail statt eines Einzeilers -- wer
-  // sie liest, weiss ohne die App zu oeffnen, worum es geht und wann es ist.
-  //
-  // ⚠️ Die NOTIZ bleibt bewusst draussen. Titel, Tag und Ort braucht man, um den
-  // Termin einordnen zu koennen; die Notiz ist der Ort fuer Einzelheiten und hat
-  // in einem Postfach nichts verloren, das der Verein nicht kontrolliert. Fuer
-  // den Push gilt dieselbe Linie eine Stufe schaerfer (dort fehlt auch der Titel).
-  const eckdaten = () => {
-    const z = [];
-    if (terminIsUmfrage(t)) {
-      z.push("", "Ein fester Tag steht noch nicht fest. Zur Auswahl stehen:", "");
-      for (const c of t.umfrage.termine) {
-        const zeit = umfrageZeitLabel(c);
-        z.push("  • " + fmtDate(c.datum) + (zeit ? ", " + zeit : ""));
-      }
-      z.push("", "Bitte stimme im Vereinskalender ab, wann es dir passt — direkt auf der",
-        "Terminkarte, das dauert einen Klick.");
-    } else {
-      z.push("Wann:    " + terminDatumLabel(t) + ", " + terminZeitLabel(t));
-      if (t.ort) z.push("Wo:      " + t.ort);
-    }
-    return z;
-  };
-
-  const brief = (einleitung, schluss) => [
-    "Hallo,", "", einleitung, "",
-    "Termin:  " + t.titel,
-    ...eckdaten(),
-    "", schluss, "",
-    "Zum Vereinskalender: " + link, "",
-    "Den Termin sehen nur die Personen, mit denen er geteilt wurde — er steht nicht",
-    "im öffentlichen Kalender des Vereins.", "",
-    "Diese Nachricht wurde automatisch verschickt."
-  ].join("\n");
-
-  for (const u of neu) {
-    await sende(u, "Neuer privater Termin im Vereinskalender", brief(
-      `${von} hat einen privaten Termin mit dir geteilt.`,
-      "Weitere Einzelheiten und eventuelle Anhänge findest du im Vereinskalender."));
+  if (t.privat) {
+    const jetzt = Array.isArray(t.geteiltUsers) ? t.geteiltUsers : [];
+    const vorher = before ? before.geteiltUsers : [];
+    neu = jetzt.filter((u) => !vorher.includes(u));
+    bestehend = jetzt.filter((u) => vorher.includes(u));
+    // Niemand neu dabei und inhaltlich unverändert -> es gibt nichts zu sagen.
+    if (!neu.length && !(bestehend.length && inhaltGeaendert)) return;
+  } else {
+    // Nicht privat: beim Bearbeiten nur melden, wenn sich sichtbar etwas
+    // geändert hat. Wer eine Notiz korrigiert oder einen Anhang tauscht, löst
+    // nichts aus.
+    if (before && !inhaltGeaendert) return;
   }
-  if (inhaltGeaendert) {
-    for (const u of bestehend) {
-      await sende(u, "Privater Termin geändert: " + t.titel, brief(
-        `${von} hat einen mit dir geteilten privaten Termin geändert. Hier der neue Stand:`,
-        "Bitte prüfe im Vereinskalender, ob der Termin so für dich passt."));
-    }
-  }
-}
 
-// ---------- Nicht-private Termine: Push an alle (seit 2026-08-03) ----------
-// Michel-Vorgabe: "nicht nur Private, sondern wirklich jeder Termin". Der
-// Empfaengerkreis wird SERVERSEITIG bestimmt (alle Personalkonten ausser dem
-// Ausloeser, keine Spielerkonten) -- diese App kennt den Nutzerbestand gar
-// nicht, und 200 Einzelaufrufe wie beim Mail-Weg waeren hier absurd.
-//
-// ⚠️ Nur fuer NICHT-private Termine. Private laufen weiter ueber
-// notifyShareTargets: dort gibt es Mail und Push, aber ausschliesslich an die
-// tatsaechlich Geteilten. Ohne diese Trennung bekaeme ein privater Termin
-// beides doppelt -- und zusaetzlich Leute, die ihn nicht sehen duerfen.
-//
-// ⚠️ Es geht KEINE Mail mit. Ein oeffentlicher Termin an die ganze Belegschaft
-// waere ein Rundschreiben, und dafuer ist der Kalender nicht da.
-async function pushOeffentlichenTermin(t, before) {
-  if (t.privat) return;
-  // Beim Bearbeiten nur melden, wenn sich sichtbar etwas geaendert hat. Wer
-  // eine Notiz korrigiert oder einen Anhang tauscht, loest nichts aus.
-  if (before && !terminInhaltGeaendert(t, before)) return;
-  try {
-    await gatewayRequest({
-      action: "vereinskalender-termin-push",
-      art: before ? "geaendert" : "neu"
-    });
-  } catch (e) {
-    // Best-effort wie beim Mail-Weg: der Termin ist zu diesem Zeitpunkt
-    // gespeichert, eine misslungene Benachrichtigung darf ihn nicht als
-    // "nicht gespeichert" erscheinen lassen.
-    console.warn("Termin-Benachrichtigung fehlgeschlagen", e);
-  }
+  await gatewayRequest({
+    action: "vereinskalender-benachrichtigung-planen",
+    terminId: t.id,
+    art: before ? "geaendert" : "neu",
+    neu,
+    bestehend,
+    inhaltGeaendert
+  });
 }
 
 // ---------- Umfrage: Abstimmen direkt auf der Terminkarte ----------
