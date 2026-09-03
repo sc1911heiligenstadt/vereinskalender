@@ -153,6 +153,27 @@ button.btn:disabled { opacity: 0.55; cursor: default; }
   box-shadow: var(--shadow);
   padding: 14px 16px;
 }
+/* Aus dem Startseiten-Widget angesprungen (?termin=<id>): die Karte hebt sich
+   kurz hervor, sonst weiss man nach dem Scrollen nicht, welche gemeint war. */
+.termin-card.angesprungen {
+  box-shadow: 0 0 0 3px var(--kat, var(--blue)), var(--shadow);
+  animation: angesprungen-puls 1.2s ease-in-out 2;
+}
+@keyframes angesprungen-puls {
+  0%, 100% { background: var(--white); }
+  50% { background: var(--blue-light); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .termin-card.angesprungen { animation: none; }
+}
+.sprung-hinweis {
+  background: var(--gold-light);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
 .termin-card.is-hero {
   border-left-width: 6px;
   box-shadow: 0 4px 18px rgba(26, 86, 160, 0.16);

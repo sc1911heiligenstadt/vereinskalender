@@ -16,6 +16,19 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.3",
+    groups: [
+      {
+        title: "Aus „Nächste Termine“ direkt zum Termin springen",
+        items: [
+          "Ein Druck auf einen Termin in der Liste „Nächste Termine“ auf der Startseite führt jetzt genau zu diesem Termin — die Karte wird kurz hervorgehoben, statt dass man ihn oben in der Liste selbst sucht.",
+          "Steht der Termin hier nicht mehr (vorbei, gelöscht oder nicht für dich freigegeben), sagt eine Zeile über der Liste das, statt still oben stehen zu bleiben.",
+          "Der Link lässt sich weitergeben: Wer ihn öffnet und die nötigen Rechte hat, landet ebenfalls beim Termin."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.2",
     groups: [
       {

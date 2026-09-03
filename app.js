@@ -1273,6 +1273,44 @@ function showConnectScreen(errorMsg) {
   document.getElementById("cloud-error").textContent = errorMsg ? "Fehler: " + errorMsg : "";
 }
 
+// ---------- Sprung zu einem Termin aus einem Link (?termin=<id>) ----------
+// Jede Zeile im Startseiten-Widget verlinkt genau ihren Termin. Ohne das hier
+// landet man nur oben in der Liste und sucht ihn von Hand wieder.
+// Die Id wird EINMAL beim Laden gelesen und nach dem ersten Sprung verworfen --
+// sonst risse jedes spaetere Rendern (speichern, abstimmen) die Ansicht wieder
+// an dieselbe Stelle.
+let sprungTerminId = null;
+try { sprungTerminId = new URLSearchParams(location.search).get("termin") || null; }
+catch (_) { sprungTerminId = null; }
+
+function springeZuTermin() {
+  if (!sprungTerminId) return;
+  const id = sprungTerminId;
+  sprungTerminId = null;
+  // Ueber dataset vergleichen statt per Attribut-Selektor: eine Termin-Id ist
+  // nur ein String und muesste sonst erst fuer CSS entschaerft werden.
+  let karte = null;
+  document.querySelectorAll(".termin-card").forEach((el) => { if (el.dataset.id === id) karte = el; });
+  const hinweisEl = document.getElementById("sprung-hinweis");
+  if (!karte) {
+    // Verwaister Verweis: der Termin ist vorbei, geloescht oder nicht fuer
+    // diesen Nutzer freigegeben. Still oben stehen zu bleiben saehe aus, als
+    // haette der Link nicht funktioniert.
+    if (hinweisEl) {
+      hinweisEl.textContent = "Der Termin aus dem Link steht hier nicht (mehr): er ist vorbei, wurde gelöscht oder ist nicht für dich freigegeben.";
+      hinweisEl.classList.remove("hidden");
+    }
+    return;
+  }
+  if (hinweisEl) { hinweisEl.textContent = ""; hinweisEl.classList.add("hidden"); }
+  // Aeltere Safari-Versionen kennen das Options-Objekt nicht und scrollen dann
+  // gar nicht -- deshalb der Fallback (siehe alte iOS-Geraete in der Flotte).
+  try { karte.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  catch (_) { karte.scrollIntoView(); }
+  karte.classList.add("angesprungen");
+  setTimeout(() => karte.classList.remove("angesprungen"), 4000);
+}
+
 async function startApp() {
   appLaeuft = true;
   document.getElementById("connect-screen").style.display = "none";
@@ -1286,6 +1324,8 @@ async function startApp() {
   await ensureDirectoryLoaded();
   await purgePastEvents();
   renderAll();
+  // Erst jetzt stehen die Karten im DOM -- vorher gaebe es nichts anzuspringen.
+  springeZuTermin();
 }
 
 async function init() {
