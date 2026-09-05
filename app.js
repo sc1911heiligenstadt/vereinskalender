@@ -848,6 +848,7 @@ async function saveTermin() {
     // Abgleich in planeBenachrichtigung() nach dem Speichern.
     const before = t ? {
       geteiltUsers: Array.isArray(t.geteiltUsers) ? t.geteiltUsers.slice() : [],
+      geteiltGruppen: Array.isArray(t.geteiltGruppen) ? t.geteiltGruppen.slice() : [],
       titel: t.titel, datum: t.datum, endDatum: t.endDatum,
       ort: t.ort, startZeit: t.startZeit, endZeit: t.endZeit,
       umfrage: umfrageSnapshot(t)
@@ -944,6 +945,8 @@ function terminInhaltGeaendert(t, before) {
 async function planeBenachrichtigung(t, before) {
   let neu = [];
   let bestehend = [];
+  let gruppenNeu = [];
+  let gruppenBestehend = [];
   const inhaltGeaendert = terminInhaltGeaendert(t, before);
 
   if (t.privat) {
@@ -951,8 +954,22 @@ async function planeBenachrichtigung(t, before) {
     const vorher = before ? before.geteiltUsers : [];
     neu = jetzt.filter((u) => !vorher.includes(u));
     bestehend = jetzt.filter((u) => vorher.includes(u));
+
+    // Teilen geht über zwei gleichrangige Wege: Personen UND Gruppen. Wer nur
+    // eine Gruppe anhakt, hat leere Personenlisten -- früher stieg der Aufruf
+    // hier aus und es entstand gar kein Anlass. Der Termin war sichtbar, aber
+    // niemand erfuhr davon. Die Gruppen werden erst im Worker in Empfänger
+    // aufgelöst: der Client kennt den Mitgliederbestand nicht und soll ihn
+    // auch nicht kennen.
+    const gJetzt = Array.isArray(t.geteiltGruppen) ? t.geteiltGruppen : [];
+    const gVorher = (before && Array.isArray(before.geteiltGruppen)) ? before.geteiltGruppen : [];
+    gruppenNeu = gJetzt.filter((g) => !gVorher.includes(g));
+    gruppenBestehend = gJetzt.filter((g) => gVorher.includes(g));
+
     // Niemand neu dabei und inhaltlich unverändert -> es gibt nichts zu sagen.
-    if (!neu.length && !(bestehend.length && inhaltGeaendert)) return;
+    const werNeu = neu.length || gruppenNeu.length;
+    const werSchonDa = bestehend.length || gruppenBestehend.length;
+    if (!werNeu && !(werSchonDa && inhaltGeaendert)) return;
   } else {
     // Nicht privat: beim Bearbeiten nur melden, wenn sich sichtbar etwas
     // geändert hat. Wer eine Notiz korrigiert oder einen Anhang tauscht, löst
@@ -966,6 +983,8 @@ async function planeBenachrichtigung(t, before) {
     art: before ? "geaendert" : "neu",
     neu,
     bestehend,
+    gruppenNeu,
+    gruppenBestehend,
     inhaltGeaendert
   });
 }

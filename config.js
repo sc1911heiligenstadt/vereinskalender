@@ -16,6 +16,18 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.4",
+    groups: [
+      {
+        title: "Mit einer Gruppe geteilt heißt jetzt auch: die Gruppe erfährt davon",
+        items: [
+          "Wer einen privaten Termin nur über die Haken bei „Zusätzlich sichtbar für (Gruppen)“ teilt, löst jetzt eine Nachricht aus — wie beim Teilen mit einzelnen Personen.",
+          "Vorher passierte in diesem Fall gar nichts. Der Termin war für die Gruppe sichtbar, aber es ging weder Mail noch Handy-Nachricht raus. Wer nicht zufällig in den Kalender schaute, wusste nichts davon — und im Fenster sahen die Haken für Gruppen genauso aus wie die Chips für Personen."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.3",
     groups: [
       {
