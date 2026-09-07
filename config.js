@@ -16,6 +16,18 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.6",
+    groups: [
+      {
+        title: "Abstimmen mit abgelaufener Sitzung sagt jetzt, was los ist",
+        items: [
+          "Wer bei einer Terminumfrage abgestimmt hat, während die Anmeldung im Hintergrund abgelaufen war, bekam den allgemeinen Hinweis „Die Sitzung ist abgelaufen“ — die dafür vorgesehene, genauere Meldung wurde nie erreicht, weil die Seite vorher in einen Fehler lief.",
+          "Der Fehler ist weg. Am Ablauf ändert sich nichts: du landest wie bisher auf dem Anmelde-Hinweis und stimmst nach dem Neuanmelden erneut ab."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.5",
     groups: [
       {

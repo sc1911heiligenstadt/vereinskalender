@@ -355,7 +355,13 @@ function terminCardHtml(t, isHero) {
     </div>`;
 }
 
+// ⚠️ Der Waechter gehoert HIERHER und nicht nur an renderAll(): renderTermine()
+// wird an drei Stellen direkt gerufen (castVote, deleteTermin), renderAbo() an
+// dreien. Nach raeumeBildschirm() ist #app-shell leer, und jeder dieser Wege
+// stirbt dann an einem TypeError. Am Aufrufer kann die naechste neue Stelle es
+// wieder vergessen -- an der Funktion selbst nicht.
 function renderTermine() {
+  if (bildschirmGeraeumt) return;
   const upcoming = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t)).sort(sortTermine);
   const heroEl = document.getElementById("hero");
   const listEl = document.getElementById("termin-list");
@@ -433,6 +439,7 @@ function setAboStatus(text, art) {
 }
 
 function renderAbo() {
+  if (bildschirmGeraeumt) return;
   const karte = document.getElementById("abo-karte");
   if (!karte || !aboState) return;
   const aktiv = !!aboState.aktiv;
@@ -1038,8 +1045,17 @@ async function castVote(terminId, candId, val) {
     setSaveStatus("Gespeichert " + time, "ok");
   } catch (e) {
     t.umfrage.stimmen = vorher;
-    renderTermine();
+    // ⚠️ Der Sitzungsverlust MUSS vor dem Neuzeichnen stehen. db.js ruft bei 401
+    // raeumeBeiSitzungsverlust(), und das leert ueber raeumeBildschirm() den
+    // ganzen #app-shell -- danach ist #termine-count nicht mehr im DOM und
+    // renderTermine() stirbt an einem TypeError, noch bevor diese Zeile hier
+    // erreicht waere. Die eigene, genauere Meldung war damit toter Code.
+    // renderTermine() traegt seit demselben Fix zwar selbst den Waechter
+    // `if (bildschirmGeraeumt) return;` -- die Reihenfolge bleibt trotzdem so:
+    // erst den Sitzungsverlust behandeln, dann zeichnen. Sonst liest sich der
+    // Zweig, als wuerde nach einer 401 noch etwas gezeichnet.
     if (e instanceof NotLoggedInError) { showConnectScreen("Sitzung abgelaufen — bitte neu anmelden."); return; }
+    renderTermine();
     console.error("Abstimmen fehlgeschlagen", e);
     setSaveStatus("Nicht gespeichert", "error");
     alert("Deine Stimme konnte nicht gespeichert werden: " + e.message);
@@ -1382,6 +1398,13 @@ function springeZuTermin() {
 
 async function startApp() {
   appLaeuft = true;
+  // ⚠️ Zuruecksetzen, nicht nur setzen. Sonst hiesse der Merker "war irgendwann
+  // mal geraeumt" statt "ist gerade geraeumt" -- und jeder Renderer mit dem
+  // Waechter (renderAll, renderTermine, renderAbo) taete nach einem einmaligen
+  // Sitzungsverlust fuer immer still nichts. Heute fuehrt kein Weg ohne Neuladen
+  // zurueck in die App; sobald einer dazukommt, waere das eine leere Seite ohne
+  // jede Meldung.
+  bildschirmGeraeumt = false;
   document.getElementById("connect-screen").style.display = "none";
   document.getElementById("app-shell").style.display = "";
   try { currentUser = await fetchMe(); } catch (_) { /* best effort */ }
