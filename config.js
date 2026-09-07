@@ -16,6 +16,18 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.7",
+    groups: [
+      {
+        title: "Der Knopf „Kalender“ lässt sich am Handy leichter treffen",
+        items: [
+          "Am Handy war der Knopf oben rechts an der Terminkarte nur 36 × 26 Pixel groß — kleiner als alles andere in dieser App. Wer danebentippte, öffnete als Bearbeiter das Bearbeiten-Fenster.",
+          "Die Fläche, die auf einen Tipp reagiert, ist jetzt 44 × 44 Pixel. Am Aussehen ändert sich nichts: der Knopf bleibt genau so groß wie vorher, nur der unsichtbare Rand um ihn herum fängt jetzt mit."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.6",
     groups: [
       {
@@ -23,13 +35,6 @@ const APP_CHANGELOG = [
         items: [
           "Wer bei einer Terminumfrage abgestimmt hat, während die Anmeldung im Hintergrund abgelaufen war, bekam den allgemeinen Hinweis „Die Sitzung ist abgelaufen“ — die dafür vorgesehene, genauere Meldung wurde nie erreicht, weil die Seite vorher in einen Fehler lief.",
           "Der Fehler ist weg. Am Ablauf ändert sich nichts: du landest wie bisher auf dem Anmelde-Hinweis und stimmst nach dem Neuanmelden erneut ab."
-        ]
-      },
-      {
-        title: "Der Knopf „Kalender“ lässt sich am Handy leichter treffen",
-        items: [
-          "Am Handy war der Knopf oben rechts an der Terminkarte nur 36 × 26 Pixel groß — kleiner als alles andere in dieser App. Wer danebentippte, öffnete als Bearbeiter das Bearbeiten-Fenster.",
-          "Die Fläche, die auf einen Tipp reagiert, ist jetzt 44 × 44 Pixel. Am Aussehen ändert sich nichts: der Knopf bleibt genau so groß wie vorher, nur der unsichtbare Rand um ihn herum fängt jetzt mit."
         ]
       }
     ]
