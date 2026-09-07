@@ -139,6 +139,16 @@ async function gatewayVote(terminId, candId, wert) {
   return (body.stimmen && typeof body.stimmen === "object") ? body.stimmen : null;
 }
 
+// Einen EINZELNEN Termin als .ics-Datei holen — Gegenstück zum Abo-Feed weiter
+// unten. ⚠️ Gebaut wird die Datei im Worker, nicht hier: dort steht das
+// ics-Format der Flotte an genau einer Stelle (Sommerzeit-Rechnung,
+// Zeilenfaltung, Auffächerung von Umfrage-Terminen). Eine zweite Fassung im
+// Browser liefe unweigerlich auseinander.
+// Rückgabe: { ok, ics, dateiname }.
+async function gatewayTerminIcs(terminId) {
+  return gatewayRequest({ action: "vereinskalender-termin-ics", terminId });
+}
+
 // ---------- Abo-Link für den eigenen Kalender ----------
 // Der Feed selbst läuft NICHT über diese Funktionen, sondern wird vom
 // Kalenderprogramm direkt unter der zurückgelieferten URL abgerufen — dort gibt es

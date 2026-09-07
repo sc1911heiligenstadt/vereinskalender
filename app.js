@@ -305,6 +305,17 @@ function quelleName(t) {
   return (t && t.quelle && QUELL_APPS[t.quelle.app]) || "Aus einer anderen App";
 }
 
+// Knopf oben rechts an der Karte: DIESEN einen Termin in den eigenen Kalender
+// übernehmen. ⚠️ Er liegt absichtlich in der Karte selbst und nicht im
+// Bearbeiten-Dialog — den öffnen nur Bearbeiter, gemeint ist der Knopf aber für
+// jeden, der den Termin sieht (gleiche Linie wie der Abo-Link im Info-Tab).
+function icsButtonHtml(t) {
+  return `<button type="button" class="tc-ics" data-ics-id="${escapeHtml(t.id)}"` +
+    ` title="Diesen Termin in den eigenen Kalender übernehmen"` +
+    ` aria-label="Termin ${escapeHtml(t.titel)} in den eigenen Kalender übernehmen">` +
+    `📅<span class="tc-ics-text">Kalender</span></button>`;
+}
+
 function terminCardHtml(t, isHero) {
   const start = terminAnzeigeStartIso(t);
   const end = terminEndIso(t);
@@ -322,6 +333,7 @@ function terminCardHtml(t, isHero) {
   const erstelltHtml = erstellt ? `<div class="tc-meta">🕓 ${escapeHtml(erstellt)}</div>` : "";
   return `
     <div class="termin-card${isHero ? " is-hero" : ""}" data-id="${escapeHtml(t.id)}" style="--kat:${escapeHtml(farbe)}">
+      ${icsButtonHtml(t)}
       ${isHero ? `<div class="hero-label">Nächster Termin</div>` : ""}
       <div class="tc-inner">
         <div class="tc-date">${dayBadge}</div>
@@ -1068,6 +1080,44 @@ async function purgePastEvents() {
 }
 
 // ---------- Anhang ansehen (neuer Tab, kein erzwungener Download) ----------
+// Einen einzelnen Termin als .ics-Datei herunterladen (Knopf oben rechts an der
+// Karte). Der Worker baut die Datei und liefert sie als Text; hier wird daraus
+// ein Download.
+//
+// ⚠️ Das ist eine KOPIE des heutigen Standes. Ändert sich der Termin morgen,
+// erfährt der eigene Kalender davon nichts — der Weg für „immer aktuell" ist der
+// Abo-Link im Info-Tab. Beides nebeneinander ist Absicht: das Abo ist der ganze
+// Kalender, dies hier ein einzelner Termin.
+//
+// ⚠️ Kein window.open: ein neuer Tab würde die .ics-Datei bei manchen Browsern
+// als Text anzeigen statt sie ans Kalenderprogramm zu geben. Ein <a download>
+// überlässt dem Betriebssystem, was mit text/calendar geschieht.
+async function terminAlsIcsLaden(id, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const antwort = await gatewayTerminIcs(id);
+    const ics = antwort && typeof antwort.ics === "string" ? antwort.ics : "";
+    if (!ics) throw new Error("Der Server hat keine Kalenderdatei geliefert.");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (antwort.dateiname && String(antwort.dateiname)) || "termin.ics";
+    // Safari lädt nur herunter, wenn das Element wirklich im Dokument hängt.
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Nicht sofort freigeben: der Download läuft in manchen Browsern erst an,
+    // nachdem der Klick-Handler zurückgekommen ist.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    console.error("Kalendereintrag konnte nicht erzeugt werden", e);
+    alert("Der Kalendereintrag konnte nicht erzeugt werden: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function viewAnhang(id, mime) {
   // Leeres Fenster SOFORT (synchron im Klick-Handler) öffnen, sonst greift in
   // manchen Browsern der Popup-Blocker, weil der eigentliche Fetch erst nach
@@ -1437,6 +1487,11 @@ function onCardClick(e) {
   if (vote) { castVote(vote.dataset.terminId, vote.dataset.candId, vote.dataset.val); return; }
   const anhang = e.target.closest(".anhang");
   if (anhang) { viewAnhang(anhang.dataset.fileId, anhang.dataset.mime); return; }
+  // ⚠️ Muss VOR dem Karten-Klick stehen — sonst öffnet der Knopf bei einem
+  // Bearbeiter zusätzlich das Bearbeiten-Fenster (gleiche Reihenfolge-Falle wie
+  // bei .umfrage-vote).
+  const ics = e.target.closest(".tc-ics");
+  if (ics) { terminAlsIcsLaden(ics.dataset.icsId, ics); return; }
   const card = e.target.closest(".termin-card");
   if (card && canEdit()) openTerminModal(card.dataset.id);
 }

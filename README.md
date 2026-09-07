@@ -64,6 +64,16 @@ zusätzlich die eigenen privaten und die geteilten. **Der Link ist der Ausweis:*
 wer ihn hat, sieht diese Termine — er lässt sich jederzeit entwerten und neu
 erzeugen, und mit dem Konto oder dem Zugang zum Kalender erlischt er sofort.
 
+### Nur ein einzelner Termin
+
+Oben rechts an jeder Terminkarte steht ein Knopf **Kalender**. Er legt genau
+diesen einen Termin in den eigenen Kalender — ohne Abo, ohne Link. Bei einem
+Termin mit Umfrage kommt jeder Vorschlag als eigener Eintrag „unter Vorbehalt“
+mit.
+
+⚠️ Das ist eine **Kopie**. Ändert sich der Termin später, erfährt der eigene
+Kalender davon nichts — dafür ist das Abo da.
+
 ## Benachrichtigung aufs Handy
 
 Wird ein Termin angelegt oder inhaltlich geändert (Titel, Datum, Ort, Uhrzeit,
@@ -96,7 +106,7 @@ Termin-Dialog geräumt; zurück geht es über ein Neuladen der Seite.
 | `index.html` | drei Reiter (Termine, Einstellungen, Info), ein Termin-Dialog |
 | `config.js` | Version, Datei-Obergrenze, Standard-Kategorien, Changelog |
 | `db.js` | Anbindung an das Gateway der Tools-Übersicht |
-| `app.js` | Terminliste, Formular, Umfragen, Teilen, Abo-Link, Rechte |
+| `app.js` | Terminliste, Formular, Umfragen, Teilen, Abo-Link, Einzeltermin als Datei, Rechte |
 | `style.css` | Gestaltung |
 
 Vanilla JavaScript ohne Build-Schritt — die Dateien werden so ausgeliefert, wie sie im Repo liegen. Veröffentlicht über GitHub Pages. Die Daten liegen in der Vereins-Nextcloud; der Zugriff läuft ausschließlich über den Login-Worker der Tools-Übersicht, nie mit Zugangsdaten im Browser. Ändern zwei Geräte gleichzeitig denselben Stand, erkennt die App das, lädt den fremden Stand nach und sagt Bescheid.

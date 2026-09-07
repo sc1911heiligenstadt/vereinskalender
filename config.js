@@ -16,6 +16,19 @@ const DEFAULT_KATEGORIEN = [
 
 const APP_CHANGELOG = [
   {
+    version: "1.5",
+    groups: [
+      {
+        title: "Einzelnen Termin in den eigenen Kalender übernehmen",
+        items: [
+          "Oben rechts an jeder Terminkarte steht jetzt ein Knopf „Kalender“. Ein Druck darauf lädt genau diesen einen Termin als Kalenderdatei herunter — mit Titel, Datum, Uhrzeit, Ort und Kategorie.",
+          "Bei einem Termin mit Umfrage kommt jeder Terminvorschlag als eigener Eintrag mit, als „unter Vorbehalt“ markiert — wie im Abo-Kalender auch.",
+          "Das ist eine Kopie: Ändert sich der Termin später, weiß der eigene Kalender davon nichts. Wer alle Vereinstermine dauerhaft nachgeführt haben möchte, nimmt weiterhin den Abo-Link im Info-Tab."
+        ]
+      }
+    ]
+  },
+  {
     version: "1.4",
     groups: [
       {

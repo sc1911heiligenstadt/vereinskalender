@@ -419,3 +419,43 @@ nav .nav-right { margin-left: auto; display: flex; flex-wrap: wrap; gap: inherit
 .abo-hilfe { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
 .abo-hilfe summary { font-size: 13px; font-weight: 600; color: var(--blue); cursor: pointer; }
 .abo-hilfe ul { margin: 10px 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+/* ---------- Knopf oben rechts an der Terminkarte: diesen einen Termin als
+   .ics herunterladen (seit 1.5) ----------
+   ⚠️ Die Karte braucht dafür position: relative — ohne das hängt der Knopf am
+   nächsten positionierten Vorfahren und landet irgendwo auf der Seite. */
+.termin-card { position: relative; }
+.tc-ics {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--blue);
+  cursor: pointer;
+}
+.tc-ics:hover { background: var(--blue-light); border-color: var(--blue); }
+.tc-ics:disabled { opacity: 0.55; cursor: default; }
+
+/* ⚠️ Der Knopf schwebt über der ersten Zeile der Karte. Ohne diesen Freiraum
+   schiebt sich die Abzeichen-Reihe (Umfrage/Privat/Quelle) darunter, sobald sie
+   umbricht — dann steht Text unter dem Knopf und ist nicht mehr antippbar.
+   Die Zahl ist die Knopfbreite plus Abstand, nicht geraten: 📅 + „Kalender" in
+   12px fett + 2×11px Innenabstand. */
+.tc-top { padding-right: 104px; }
+
+@media (max-width: 560px) {
+  /* Am Handy nur das Symbol — mit Wort bliebe neben den Abzeichen zu wenig
+     Platz für den Titel. */
+  .tc-ics-text { display: none; }
+  .tc-ics { padding: 6px 9px; }
+  .tc-top { padding-right: 44px; }
+}
