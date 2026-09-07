@@ -426,6 +426,9 @@ nav .nav-right { margin-left: auto; display: flex; flex-wrap: wrap; gap: inherit
    nächsten positionierten Vorfahren und landet irgendwo auf der Seite. */
 .termin-card { position: relative; }
 .tc-ics {
+  /* ⚠️ absolute (zur Karte) UND zugleich Bezugspunkt für das eigene ::before
+     weiter unten — ein positioniertes Element ist beides. Ohne das hängte die
+     vergrößerte Trefferfläche an der Karte und läge irgendwo. */
   position: absolute;
   top: 10px;
   right: 10px;
@@ -444,6 +447,23 @@ nav .nav-right { margin-left: auto; display: flex; flex-wrap: wrap; gap: inherit
 }
 .tc-ics:hover { background: var(--blue-light); border-color: var(--blue); }
 .tc-ics:disabled { opacity: 0.55; cursor: default; }
+/* ⚠️ Trefferfläche auf 44×44 px (Abnahme 2026-09-07). Gemessen war der Knopf am
+   Handy 36×26 px — die Nav-Knöpfe derselben App sind 85×39. Erschwerend sitzt er
+   absolut in der Ecke einer Karte, die selbst klickbar ist: bei einem Bearbeiter
+   öffnet ein Fehlgriff das Bearbeiten-Fenster statt den Download.
+   Bewusst über ein ::before und NICHT über größeres padding: Polsterung hätte die
+   sichtbare Pille aufgebläht und damit den Platz für den Titel daneben gekostet
+   (dafür steht das abgezählte padding-right an .tc-top). So bleibt die Optik
+   unverändert und nur die Fläche wächst. */
+.tc-ics::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+}
 
 /* ⚠️ Der Knopf schwebt über der ersten Zeile der Karte. Ohne diesen Freiraum
    schiebt sich die Abzeichen-Reihe (Umfrage/Privat/Quelle) darunter, sobald sie
