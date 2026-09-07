@@ -14,7 +14,125 @@ const DEFAULT_KATEGORIEN = [
   { id: "sonstiges",     name: "Sonstiges",               farbe: "#6b7280" }
 ];
 
+// Was der Vereinskalender kann -- steht im Info-Reiter als Karte "Funktionen".
+// WICHTIG: Das ist NICHT der Changelog. Hier steht der ZUSTAND ("private Termine
+// lassen sich teilen"), dort die Aenderung ("private Termine lassen sich JETZT
+// teilen"). Wer eine Funktion umbaut oder abschaltet, zieht diesen Text mit --
+// und ebenso E:\SC1911-Tools-Anleitung.txt, wo dasselbe ausfuehrlich steht.
+const APP_FUNKTIONEN = [
+  {
+    title: "Was der Kalender zeigt",
+    items: [
+      "Eine Übersicht der als Nächstes anstehenden Vereinstermine — gesperrte Hallen und Plätze, Trainingszeiten, Veranstaltungen. Bewusst kein voller Kalender, sondern nur das, was noch bevorsteht.",
+      "Der nächste Termin steht oben als hervorgehobene Karte, die weiteren folgen darunter nach Monat gruppiert.",
+      "Vergangene Termine verschwinden von selbst aus der Ansicht, samt der zu ihnen hochgeladenen Dateien.",
+      "Jede Karte nennt, von wem und wann der Termin angelegt wurde."
+    ]
+  },
+  {
+    title: "Termine eintragen",
+    items: [
+      "Ein Termin hat Titel, Kategorie, Datum — auch mehrtägig —, wahlweise Uhrzeit oder ganztägig, Ort und Notiz.",
+      "An jeden Termin lassen sich Dateien hängen: PDF, Bilder oder andere Formate, bis 10 MB je Datei. Alle angemeldeten Nutzer können sie öffnen und herunterladen.",
+      "Ein Druck auf einen bestehenden Termin öffnet ihn zum Ändern oder Löschen."
+    ]
+  },
+  {
+    title: "Private Termine und Teilen",
+    items: [
+      "Ein Termin lässt sich als privat markieren — dann sieht ihn nur, wer ihn angelegt hat.",
+      "Private Termine lassen sich gezielt mit einzelnen Personen über ein Suchfeld oder mit ganzen Gruppen teilen. Diese sehen den Termin dann zusätzlich.",
+      "Wer einen privaten Termin geteilt bekommt, erhält eine E-Mail — beim ersten Teilen und bei späteren Änderungen. Sie nennt Titel, Tag, Uhrzeit und Ort.",
+      "Die Notiz zum Termin bleibt aus der E-Mail draußen. Alle Einzelheiten stehen nur in der App."
+    ]
+  },
+  {
+    title: "Umfrage-Termine",
+    items: [
+      "Statt eines festen Datums lassen sich mehrere Terminvorschläge eintragen, über die abgestimmt wird. Jeder Vorschlag kann eine eigene Uhrzeit haben, „von“ und „bis“, beides freiwillig.",
+      "Abgestimmt wird direkt auf der Terminkarte per Haken oder Kreuz. Ein weiterer Knopf zeigt die Namen der Zu- und Absagen je Vorschlag.",
+      "Abstimmen darf jeder, der den Termin sehen darf — auch ohne Bearbeiten-Recht. Ein zweiter Druck auf denselben Knopf zieht die eigene Stimme zurück.",
+      "Angezeigt werden nur die Vorschläge, die noch bevorstehen. Uhrzeiten lassen sich bei laufender Umfrage nachtragen, ohne dass abgegebene Stimmen verloren gehen."
+    ]
+  },
+  {
+    title: "In den eigenen Kalender übernehmen",
+    items: [
+      "Im Reiter „Info“ lässt sich ein persönlicher Kalender-Link erzeugen. Damit erscheinen die Vereinstermine dauerhaft im eigenen Kalender — am Handy, im Google-Konto oder in Outlook.",
+      "Das ist keine einmalige Kopie: der eigene Kalender ruft den Link von selbst regelmäßig ab, neue und geänderte Termine kommen von allein dazu.",
+      "Beim Erzeugen ist wählbar, ob nur die allgemeinen Vereinstermine übernommen werden oder zusätzlich die eigenen privaten und die mit einem geteilten. Ohne Haken bleiben private Termine außen vor.",
+      "Der Link ist der Ausweis: wer ihn hat, sieht die Termine. Er lässt sich jederzeit entwerten und neu erzeugen. Mit dem Konto oder dem Zugang zum Kalender hört er auf zu funktionieren.",
+      "Wie schnell Änderungen ankommen, bestimmt das eigene Kalenderprogramm. Apple und Outlook fragen im Minutenabstand nach, Google nur alle paar Stunden — das lässt sich von hier aus nicht beschleunigen."
+    ]
+  },
+  {
+    title: "Einen einzelnen Termin mitnehmen",
+    items: [
+      "Oben rechts an jeder Terminkarte steht ein Knopf „Kalender“. Er lädt genau diesen einen Termin als Kalenderdatei herunter — mit Titel, Datum, Uhrzeit, Ort und Kategorie.",
+      "Bei einem Termin mit Umfrage kommt jeder Vorschlag als eigener Eintrag mit, als „unter Vorbehalt“ markiert.",
+      "Das ist eine Kopie: Ändert sich der Termin später, erfährt der eigene Kalender davon nichts. Wer alles nachgeführt haben möchte, nimmt den Abo-Link im Info-Reiter."
+    ]
+  },
+  {
+    title: "Termine aus anderen Werkzeugen",
+    items: [
+      "Anstehende Fußballcamps stehen von selbst im Kalender. Angelegt und gepflegt werden sie weiterhin im Fußballcamp-Tool.",
+      "Solche Termine tragen auf der Karte ein Zeichen, das die Herkunft nennt. Titel, Datum, Ort, Zeit und Notiz werden von dort überschrieben.",
+      "Kategorie und Anhänge gehören dagegen dem Kalender — sie bleiben stehen, auch wenn sich am Camp etwas ändert.",
+      "Löschen lässt sich so ein Termin ganz normal. Er kommt dann nicht wieder."
+    ]
+  },
+  {
+    title: "Benachrichtigung aufs Handy",
+    items: [
+      "Wird ein Termin angelegt oder inhaltlich geändert, bekommt das Personal eine Nachricht aufs Handy — vorausgesetzt, es hat sie in der Tools-Übersicht unter „Mein Konto“ eingeschaltet.",
+      "Gemeldet werden Änderungen an Titel, Datum, Ort, Uhrzeit oder den Vorschlägen einer Umfrage. Eine korrigierte Notiz oder ein ausgetauschter Anhang lösen bewusst nichts aus.",
+      "Mail und Nachricht gehen erst zehn Minuten nach der letzten Änderung raus. Wer gleich nachbessert, löst damit nur eine Nachricht aus statt einer je Speichern.",
+      "Wer den Termin selbst anlegt, bekommt keine Meldung darüber. Spielerkonten werden nicht benachrichtigt.",
+      "Bei privat geteilten Terminen gehen Mail und Nachricht nur an die Personen, mit denen der Termin geteilt wurde. Eine E-Mail an alle gibt es nicht — ein öffentlicher Termin ist kein Rundschreiben."
+    ]
+  },
+  {
+    title: "Kategorien",
+    items: [
+      "Kategorien lassen sich anlegen, umbenennen, umfärben und löschen.",
+      "Sie stehen danach im Termin-Formular zur Auswahl und geben der Karte ihre Farbe."
+    ]
+  },
+  {
+    title: "Wer darf was",
+    items: [
+      "Sehen: alle Termine ansehen, Anhänge öffnen, bei Umfragen abstimmen und sich den Kalender-Link erzeugen.",
+      "Bearbeiten: Termine anlegen, ändern und löschen, Dateien anhängen, Termine teilen.",
+      "Administrieren: die Kategorien im Reiter „Einstellungen“ pflegen.",
+      "Der Reiter „Info“ steht jedem angemeldeten Nutzer offen.",
+      "Fällt die Anmeldung weg, während die App offen ist, räumt sie den Bildschirm samt Termin-Fenster, statt Namen und Eingaben im Hintergrund lesbar zu lassen."
+    ]
+  },
+  {
+    title: "Bedienung und Speicherung",
+    items: [
+      "Die Ansicht ist für das Handy gebaut und funktioniert dort vollständig.",
+      "Gespeichert wird in der Vereins-Nextcloud über die zentrale Anmeldung der Tools-Übersicht — ein eigenes Passwort braucht es nicht.",
+      "Ändern zwei Geräte gleichzeitig denselben Stand, erkennt die App das, lädt den fremden Stand nach und sagt Bescheid."
+    ]
+  }
+];
+
 const APP_CHANGELOG = [
+  {
+    version: "1.8",
+    groups: [
+      {
+        title: "Im Info-Reiter steht jetzt, was die App kann",
+        items: [
+          "Die Liste der Änderungen und die Versionsnummer sind aus dem Info-Reiter verschwunden.",
+          "Stattdessen steht dort die Karte „Funktionen“: was die App kann, nach Themen geordnet.",
+          "Was sich geändert hat, steht weiterhin in den Neuigkeiten auf der Startseite der Tools-Übersicht."
+        ]
+      }
+    ]
+  },
   {
     version: "1.7",
     groups: [

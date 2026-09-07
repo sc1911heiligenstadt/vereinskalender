@@ -479,3 +479,7 @@ nav .nav-right { margin-left: auto; display: flex; flex-wrap: wrap; gap: inherit
   .tc-ics { padding: 6px 9px; }
   .tc-top { padding-right: 44px; }
 }
+
+/* Karte "Funktionen" im Info-Reiter -- gleiche Optik wie frueher die
+   Aenderungsliste, nur ohne Versionsueberschriften. */
+#funktionen-list { display: flex; flex-direction: column; gap: 18px; font-size: 13px; }
