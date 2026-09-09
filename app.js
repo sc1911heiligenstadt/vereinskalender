@@ -147,6 +147,33 @@ function kategorieById(id) { return appData.kategorien.find((k) => k.id === id) 
 function katFarbe(id) { const k = kategorieById(id); return k ? k.farbe : "#6b7280"; }
 function katName(id) { const k = kategorieById(id); return k ? k.name : "—"; }
 
+// ---------- Kategorie-Filter (seit 09.09.2026) ----------
+// Gespeichert werden die AUSGEBLENDETEN Kategorien, nicht die gewaehlten. Damit
+// ist eine spaeter angelegte Kategorie bei allen automatisch sichtbar; andersherum
+// bliebe sie fuer jeden, der schon einmal gefiltert hat, unsichtbar -- und niemand
+// wuesste warum. Der Filter liegt im Browser des Nutzers, nicht in den Daten: er
+// ist eine Sicht auf die Liste, keine Eigenschaft des Kalenders.
+const KAT_FILTER_KEY = "vk-kat-ausgeblendet";
+let katAus = ladeKatFilter();
+
+function ladeKatFilter() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(KAT_FILTER_KEY) || "[]");
+    return new Set(Array.isArray(roh) ? roh.filter((x) => typeof x === "string") : []);
+  } catch (_) { return new Set(); }
+}
+function speichereKatFilter() {
+  try { localStorage.setItem(KAT_FILTER_KEY, JSON.stringify(Array.from(katAus))); }
+  catch (_) { /* privates Fenster o.ae. -- der Filter gilt dann nur bis zum Neuladen */ }
+}
+// Ein Termin, dessen Kategorie es nicht (mehr) gibt, bleibt sichtbar: fuer ihn
+// gibt es keinen Knopf, mit dem man ihn wieder hervorholen koennte.
+function terminPasstZumKatFilter(t) {
+  if (!katAus.size) return true;
+  if (!kategorieById(t.kategorie)) return true;
+  return !katAus.has(t.kategorie);
+}
+
 // ---------- Rechte / Nutzer ----------
 // Bearbeiten dürfen Site-Admins sowie Nutzer, deren Gruppe in der Tools-Übersicht
 // für diese App Bearbeiten-Rechte hat (server-seitig aufgelöst, siehe fetchMe in
@@ -355,6 +382,50 @@ function terminCardHtml(t, isHero) {
     </div>`;
 }
 
+// Die Filterleiste ueber der Terminliste. Sie erscheint erst ab zwei Kategorien --
+// mit einer einzigen waere sie ein Knopf, der entweder alles oder nichts zeigt.
+// Wird aus renderTermine() heraus gezeichnet, nicht aus renderAll(): renderTermine()
+// laeuft auch direkt (castVote, deleteTermin), und die Zahlen an den Knoepfen
+// stuenden sonst hinterher auf einem alten Stand.
+function renderKatFilter() {
+  const el = document.getElementById("kat-filter");
+  if (!el) return;
+  const kats = appData.kategorien || [];
+  el.classList.toggle("hidden", kats.length < 2);
+  if (kats.length < 2) { el.innerHTML = ""; return; }
+  // Die Zahl je Kategorie zaehlt OHNE den Filter selbst -- sonst stuende hinter
+  // jeder ausgeblendeten Kategorie eine 0 und niemand saehe, was ihm entgeht.
+  const sichtbare = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t));
+  const knoepfe = kats.map((k) => {
+    const an = !katAus.has(k.id);
+    const anzahl = sichtbare.filter((t) => t.kategorie === k.id).length;
+    return `<button type="button" class="kat-filter-btn${an ? " an" : ""}"
+        data-kat="${escapeHtml(k.id)}" aria-pressed="${an ? "true" : "false"}"
+        title="${escapeHtml(k.name)} ${an ? "ausblenden" : "wieder einblenden"}"><span class="kat-dot" style="background:${escapeHtml(k.farbe)}"></span><span class="kfb-name">${escapeHtml(k.name)}</span><span class="kfb-zahl">${anzahl}</span></button>`;
+  }).join("");
+  // Der Ausweg steht NEBEN den Knoepfen und nur, wenn tatsaechlich etwas
+  // ausgeblendet ist -- sonst waere er ein Knopf, der nichts tut.
+  const alle = katAus.size
+    ? `<button type="button" class="kat-filter-alle" data-kat-alle="1">Alle zeigen</button>`
+    : "";
+  el.innerHTML = knoepfe + alle;
+}
+
+function onKatFilterClick(e) {
+  if (e.target.closest("[data-kat-alle]")) {
+    katAus.clear();
+    speichereKatFilter();
+    renderTermine();
+    return;
+  }
+  const btn = e.target.closest(".kat-filter-btn");
+  if (!btn) return;
+  const id = btn.dataset.kat;
+  if (katAus.has(id)) katAus.delete(id); else katAus.add(id);
+  speichereKatFilter();
+  renderTermine();
+}
+
 // ⚠️ Der Waechter gehoert HIERHER und nicht nur an renderAll(): renderTermine()
 // wird an drei Stellen direkt gerufen (castVote, deleteTermin), renderAbo() an
 // dreien. Nach raeumeBildschirm() ist #app-shell leer, und jeder dieser Wege
@@ -362,21 +433,33 @@ function terminCardHtml(t, isHero) {
 // wieder vergessen -- an der Funktion selbst nicht.
 function renderTermine() {
   if (bildschirmGeraeumt) return;
-  const upcoming = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t)).sort(sortTermine);
+  renderKatFilter();
+  // Zwei Listen, mit Absicht: `alleOffen` ist der Bestand, `upcoming` das, was der
+  // Kategorie-Filter davon durchlaesst. Nur so laesst sich unten "3 von 11" sagen
+  // und "gar keine Termine" von "der Filter laesst nichts durch" unterscheiden.
+  const alleOffen = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t)).sort(sortTermine);
+  const upcoming = alleOffen.filter(terminPasstZumKatFilter);
+  const gefiltert = upcoming.length !== alleOffen.length;
   const heroEl = document.getElementById("hero");
   const listEl = document.getElementById("termin-list");
   const emptyEl = document.getElementById("termine-empty");
   const countEl = document.getElementById("termine-count");
   const weitereEl = document.getElementById("weitere-heading");
 
-  countEl.textContent = upcoming.length
-    ? `${upcoming.length} anstehende${upcoming.length === 1 ? "r Termin" : " Termine"}`
-    : "";
+  if (!alleOffen.length) countEl.textContent = "";
+  else if (gefiltert) countEl.textContent = `${upcoming.length} von ${alleOffen.length} anstehenden Terminen`;
+  else countEl.textContent = `${upcoming.length} anstehende${upcoming.length === 1 ? "r Termin" : " Termine"}`;
 
   if (upcoming.length === 0) {
     heroEl.innerHTML = "";
     listEl.innerHTML = "";
     weitereEl.classList.add("hidden");
+    // ⚠️ Zwei verschiedene Saetze: "es gibt nichts" und "du siehst gerade nichts"
+    // sind fuer den Leser zwei ganz verschiedene Lagen. Stuende hier immer der
+    // erste, suchte er den Fehler in den Daten statt am eigenen Filter.
+    emptyEl.textContent = alleOffen.length
+      ? "Kein anstehender Termin passt zu den gewählten Kategorien. Mit „Alle zeigen“ oben kommen wieder alle."
+      : "Aktuell sind keine anstehenden Termine eingetragen.";
     emptyEl.classList.remove("hidden");
     return;
   }
@@ -1397,6 +1480,22 @@ function springeZuTermin() {
   let karte = null;
   document.querySelectorAll(".termin-card").forEach((el) => { if (el.dataset.id === id) karte = el; });
   const hinweisEl = document.getElementById("sprung-hinweis");
+  // ⚠️ Bevor die Fehlermeldung kommt: haelt vielleicht nur der Kategorie-Filter
+  // den Termin zurueck? Dann waere "vorbei, geloescht oder nicht freigegeben"
+  // schlicht falsch -- und der Link aus der Mail oder dem Dashboard liefe ins
+  // Leere, obwohl der Termin da ist. Also Kategorie wieder einschalten, neu
+  // zeichnen, noch einmal suchen und sagen, was passiert ist.
+  let filterHinweis = "";
+  if (!karte) {
+    const t = appData.termine.find((x) => x && x.id === id);
+    if (t && isUpcoming(t) && terminVisibleFor(t) && !terminPasstZumKatFilter(t)) {
+      katAus.delete(t.kategorie);
+      speichereKatFilter();
+      renderTermine();
+      document.querySelectorAll(".termin-card").forEach((el) => { if (el.dataset.id === id) karte = el; });
+      if (karte) filterHinweis = "Der Termin aus dem Link war ausgeblendet — die Kategorie „" + katName(t.kategorie) + "“ ist jetzt wieder eingeschaltet.";
+    }
+  }
   if (!karte) {
     // Verwaister Verweis: der Termin ist vorbei, geloescht oder nicht fuer
     // diesen Nutzer freigegeben. Still oben stehen zu bleiben saehe aus, als
@@ -1407,7 +1506,10 @@ function springeZuTermin() {
     }
     return;
   }
-  if (hinweisEl) { hinweisEl.textContent = ""; hinweisEl.classList.add("hidden"); }
+  if (hinweisEl) {
+    hinweisEl.textContent = filterHinweis;
+    hinweisEl.classList.toggle("hidden", !filterHinweis);
+  }
   // Aeltere Safari-Versionen kennen das Options-Objekt nicht und scrollen dann
   // gar nicht -- deshalb der Fallback (siehe alte iOS-Geraete in der Flotte).
   try { karte.scrollIntoView({ behavior: "smooth", block: "center" }); }
@@ -1469,6 +1571,11 @@ function setupListeners() {
   document.getElementById("btn-abo-neu").addEventListener("click", aboNeuErzeugen);
   document.getElementById("btn-abo-loeschen").addEventListener("click", aboLoeschen);
   document.getElementById("btn-abo-kopieren").addEventListener("click", aboKopieren);
+
+  // Kategorie-Filter ueber der Liste. Ein Handler am Behaelter statt je Knopf:
+  // die Knoepfe werden bei jedem Zeichnen neu gebaut, einzelne Handler waeren
+  // danach weg.
+  document.getElementById("kat-filter").addEventListener("click", onKatFilterClick);
 
   // Termin-Karte antippen -> bearbeiten (nur Bearbeiter).
   document.getElementById("hero").addEventListener("click", onCardClick);

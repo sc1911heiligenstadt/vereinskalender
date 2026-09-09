@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>📅 Vereinskalender</title>
 <meta name="theme-color" content="#1a56a0" />
-<link rel="stylesheet" href="style.css?v=1.5" />
+<link rel="stylesheet" href="style.css?v=1.6" />
 </head>
 <body>
 
@@ -52,6 +52,11 @@
             <button class="btn small editor-only hidden" id="btn-new-termin">+ Neuer Termin</button>
           </div>
         </div>
+
+        <!-- Kategorie-Filter (seit 09.09.2026). Hier steht nur der leere Behaelter:
+             die Knoepfe baut renderKatFilter() aus appData.kategorien, damit eine
+             neu angelegte Kategorie ohne Aenderung am Markup mitkommt. -->
+        <div class="kat-filter hidden" id="kat-filter" role="group" aria-label="Termine nach Kategorie filtern"></div>
 
         <div class="sprung-hinweis hidden" id="sprung-hinweis"></div>
 
@@ -273,8 +278,8 @@
     </div>
   </div>
 
-  <script src="config.js?v=1.9"></script>
+  <script src="config.js?v=1.10"></script>
   <script src="db.js?v=1.1"></script>
-  <script src="app.js?v=1.7"></script>
+  <script src="app.js?v=1.8"></script>
 </body>
 </html>

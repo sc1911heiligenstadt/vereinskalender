@@ -205,6 +205,51 @@ body.can-edit .termin-card:hover { background: var(--blue-light); }
 .tc-notiz { font-size: 13px; color: var(--text); margin-top: 6px; white-space: pre-wrap; }
 .tc-meta { font-size: 14px; color: var(--muted); margin-top: 10px; }
 
+/* ---------- Kategorie-Filter ueber der Terminliste (seit 09.09.2026) ---------- */
+/* Die Knoepfe sehen aus wie die Kategorie-Marken auf den Karten, damit klar ist,
+   worauf sie sich beziehen. Ausgeschaltet heisst: blass und durchgestrichen --
+   Farbe allein reichte nicht, wer Rot und Gruen schlecht unterscheidet saehe
+   sonst keinen Unterschied zwischen an und aus. */
+.kat-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.kat-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  /* 44px fuer den Daumen: die Leiste steht am Handy ueber der Liste und wird
+     dort angetippt, nicht angeklickt. Dasselbe Mass, das die Abnahme vom
+     07.09.2026 fuer den Kalender-Knopf an der Terminkarte verlangt hat. */
+  min-height: 44px;
+}
+.kat-filter-btn.an { color: var(--text); border-color: var(--blue); background: var(--blue-light); }
+.kat-filter-btn:not(.an) { opacity: 0.55; }
+.kat-filter-btn:not(.an) .kfb-name { text-decoration: line-through; }
+.kat-filter-btn:not(.an) .kat-dot { background: var(--muted) !important; }
+.kfb-zahl { font-size: 11px; font-weight: 700; color: var(--muted); }
+.kat-filter-alle {
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 44px;
+}
+
 .kat-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
 .kat-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
 

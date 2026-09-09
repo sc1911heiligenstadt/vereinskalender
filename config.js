@@ -26,7 +26,8 @@ const APP_FUNKTIONEN = [
       "Eine Übersicht der als Nächstes anstehenden Vereinstermine — gesperrte Hallen und Plätze, Trainingszeiten, Veranstaltungen. Bewusst kein voller Kalender, sondern nur das, was noch bevorsteht.",
       "Der nächste Termin steht oben als hervorgehobene Karte, die weiteren folgen darunter nach Monat gruppiert.",
       "Vergangene Termine verschwinden von selbst aus der Ansicht, samt der zu ihnen hochgeladenen Dateien.",
-      "Jede Karte nennt, von wem und wann der Termin angelegt wurde."
+      "Jede Karte nennt, von wem und wann der Termin angelegt wurde.",
+      "Über der Liste steht je Kategorie ein Knopf. Ein Druck darauf blendet diese Kategorie aus, ein zweiter holt sie zurück; die Zahl am Knopf sagt, wie viele Termine dahinter stecken. Die Auswahl bleibt im eigenen Browser gespeichert und gilt nur für einen selbst."
     ]
   },
   {
@@ -120,6 +121,21 @@ const APP_FUNKTIONEN = [
 ];
 
 const APP_CHANGELOG = [
+  {
+    version: "1.9",
+    groups: [
+      {
+        title: "Termine nach Kategorie filtern",
+        items: [
+          "Über der Terminliste steht jetzt je Kategorie ein Knopf — „Halle gesperrt“, „Training“, „Veranstaltung“ und so weiter. Ein Druck darauf blendet diese Kategorie aus, ein zweiter holt sie zurück.",
+          "Die Zahl am Knopf sagt, wie viele anstehende Termine dahinter stecken. Sie ändert sich nicht mit, wenn du filterst — du siehst also immer, was du gerade ausblendest.",
+          "Ist etwas ausgeblendet, erscheint daneben „Alle zeigen“ und die Zeile über der Liste sagt „3 von 11 anstehenden Terminen“.",
+          "Die Auswahl bleibt in deinem Browser gespeichert und gilt nur für dich. Am Kalender selbst ändert sie nichts.",
+          "Führt ein Link auf einen Termin, den dein Filter gerade ausblendet, wird die Kategorie automatisch wieder eingeschaltet — und es steht dabei, dass das passiert ist."
+        ]
+      }
+    ]
+  },
   {
     version: "1.8",
     groups: [
