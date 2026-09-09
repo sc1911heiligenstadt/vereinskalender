@@ -382,46 +382,100 @@ function terminCardHtml(t, isHero) {
     </div>`;
 }
 
-// Die Filterleiste ueber der Terminliste. Sie erscheint erst ab zwei Kategorien --
-// mit einer einzigen waere sie ein Knopf, der entweder alles oder nichts zeigt.
-// Wird aus renderTermine() heraus gezeichnet, nicht aus renderAll(): renderTermine()
-// laeuft auch direkt (castVote, deleteTermin), und die Zahlen an den Knoepfen
-// stuenden sonst hinterher auf einem alten Stand.
+// Ob die Klappliste gerade offen ist. Muss ein eigener Merker sein und darf nicht
+// am DOM haengen: renderKatFilter() baut den Knopf bei jedem Zeichnen neu, und die
+// Liste soll beim Anhaken einer Kategorie NICHT zuklappen -- man haekelt meist
+// mehrere hintereinander an.
+let katFilterOffen = false;
+
+// Knopf neben der Ueberschrift plus die Klappliste darunter (Michel-Vorgabe
+// 09.09.2026: eine Klappliste statt einer Reihe Knoepfe -- die Reihe nahm bei
+// fuenf Kategorien zwei Zeilen ueber der Liste ein).
+//
+// Erscheint erst ab zwei Kategorien: mit einer waere es ein Filter, der entweder
+// alles oder nichts zeigt. Wird aus renderTermine() heraus gezeichnet, nicht aus
+// renderAll(): renderTermine() laeuft auch direkt (castVote, deleteTermin), und
+// die Zahlen stuenden sonst hinterher auf einem alten Stand.
 function renderKatFilter() {
   const el = document.getElementById("kat-filter");
   if (!el) return;
   const kats = appData.kategorien || [];
   el.classList.toggle("hidden", kats.length < 2);
-  if (kats.length < 2) { el.innerHTML = ""; return; }
-  // Die Zahl je Kategorie zaehlt OHNE den Filter selbst -- sonst stuende hinter
-  // jeder ausgeblendeten Kategorie eine 0 und niemand saehe, was ihm entgeht.
+  if (kats.length < 2) { el.innerHTML = ""; katFilterOffen = false; return; }
+  // ⚠️ Wer gerade in der Liste steht, soll nach dem Neuzeichnen noch dort stehen.
+  // Ohne das springt der Fokus bei jedem Haken an den Seitenanfang und mit der
+  // Tastatur laesst sich kein zweiter Haken setzen.
+  const fokusKat = document.activeElement && document.activeElement.dataset
+    ? document.activeElement.dataset.kat : null;
+  // Die Zahl je Kategorie zaehlt OHNE den Filter -- sonst stuende hinter jeder
+  // ausgeblendeten Kategorie eine 0 und niemand saehe, was ihm entgeht.
   const sichtbare = appData.termine.filter((t) => isUpcoming(t) && terminVisibleFor(t));
-  const knoepfe = kats.map((k) => {
+  const zeilen = kats.map((k) => {
     const an = !katAus.has(k.id);
     const anzahl = sichtbare.filter((t) => t.kategorie === k.id).length;
-    return `<button type="button" class="kat-filter-btn${an ? " an" : ""}"
-        data-kat="${escapeHtml(k.id)}" aria-pressed="${an ? "true" : "false"}"
-        title="${escapeHtml(k.name)} ${an ? "ausblenden" : "wieder einblenden"}"><span class="kat-dot" style="background:${escapeHtml(k.farbe)}"></span><span class="kfb-name">${escapeHtml(k.name)}</span><span class="kfb-zahl">${anzahl}</span></button>`;
+    return `<label class="kf-zeile${an ? "" : " aus"}">
+        <input type="checkbox" data-kat="${escapeHtml(k.id)}"${an ? " checked" : ""}>
+        <span class="kat-dot" style="background:${escapeHtml(k.farbe)}"></span>
+        <span class="kf-name">${escapeHtml(k.name)}</span>
+        <span class="kf-zahl">${anzahl}</span>
+      </label>`;
   }).join("");
-  // Der Ausweg steht NEBEN den Knoepfen und nur, wenn tatsaechlich etwas
-  // ausgeblendet ist -- sonst waere er ein Knopf, der nichts tut.
+  // Der Ausweg steht unten in der Liste und nur, wenn wirklich etwas ausgeblendet
+  // ist -- sonst waere es ein Knopf, der nichts tut.
   const alle = katAus.size
-    ? `<button type="button" class="kat-filter-alle" data-kat-alle="1">Alle zeigen</button>`
+    ? `<button type="button" class="kf-alle" data-kat-alle="1">Alle zeigen</button>`
     : "";
-  el.innerHTML = knoepfe + alle;
+  // Am Knopf steht, WIE VIELE ausgeblendet sind, nicht nur DASS gefiltert wird:
+  // ein blosses "Filter aktiv" laesst offen, wie viel man gerade nicht sieht.
+  const ausGezaehlt = kats.filter((k) => katAus.has(k.id)).length;
+  const marke = ausGezaehlt
+    ? `<span class="kf-marke">${ausGezaehlt} aus</span>`
+    : "";
+  el.innerHTML = `
+    <button type="button" class="kat-filter-toggle${ausGezaehlt ? " aktiv" : ""}"
+      aria-expanded="${katFilterOffen ? "true" : "false"}"
+      title="Termine nach Kategorie filtern">Kategorien${marke}<span class="kf-pfeil" aria-hidden="true">▾</span></button>
+    <div class="kat-filter-menu" role="group" aria-label="Termine nach Kategorie filtern"${katFilterOffen ? "" : " hidden"}>${zeilen}${alle}</div>`;
+  if (fokusKat) {
+    const wieder = el.querySelector('[data-kat="' + fokusKat.replace(/"/g, '') + '"]');
+    if (wieder) wieder.focus();
+  }
+}
+
+// Zumachen, wenn woanders hingeklickt wird. Haengt am DOKUMENT, nicht am Filter:
+// ein Klick daneben erreicht den Filter ja gerade nicht.
+function schliesseKatFilterBeiKlickDaneben(e) {
+  if (!katFilterOffen) return;
+  const el = document.getElementById("kat-filter");
+  if (el && el.contains(e.target)) return;
+  katFilterOffen = false;
+  renderKatFilter();
 }
 
 function onKatFilterClick(e) {
+  const toggle = e.target.closest(".kat-filter-toggle");
+  if (toggle) {
+    katFilterOffen = !katFilterOffen;
+    renderKatFilter();
+    return;
+  }
   if (e.target.closest("[data-kat-alle]")) {
     katAus.clear();
     speichereKatFilter();
     renderTermine();
     return;
   }
-  const btn = e.target.closest(".kat-filter-btn");
-  if (!btn) return;
-  const id = btn.dataset.kat;
-  if (katAus.has(id)) katAus.delete(id); else katAus.add(id);
+}
+
+// Eigener Handler fuer die Haken: ein Klick auf das <label> loest den Klick am
+// <input> mit aus, ueber "change" zaehlt jeder Haken genau einmal -- und die
+// Tastaturbedienung (Leertaste) kommt hier ebenfalls an, ein Klick-Handler
+// allein bekaeme sie nicht.
+function onKatFilterChange(e) {
+  const box = e.target.closest("input[data-kat]");
+  if (!box) return;
+  const id = box.dataset.kat;
+  if (box.checked) katAus.delete(id); else katAus.add(id);
   speichereKatFilter();
   renderTermine();
 }
@@ -1576,6 +1630,17 @@ function setupListeners() {
   // die Knoepfe werden bei jedem Zeichnen neu gebaut, einzelne Handler waeren
   // danach weg.
   document.getElementById("kat-filter").addEventListener("click", onKatFilterClick);
+  document.getElementById("kat-filter").addEventListener("change", onKatFilterChange);
+  // Klick daneben und Escape machen die Klappliste zu -- eine offene Liste, die
+  // nur ueber ihren eigenen Knopf wieder zugeht, fuehlt sich klemmend an.
+  // ⚠️ Capture-Phase (true). In der Bubble-Phase liefe dieser Handler NACH
+  // onKatFilterClick -- das hat da schon neu gezeichnet, e.target haengt nicht
+  // mehr im Dokument, und contains() saehe jeden Klick als "daneben" an: die
+  // Liste ginge im selben Klick wieder zu, mit dem man sie aufmacht.
+  document.addEventListener("click", schliesseKatFilterBeiKlickDaneben, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && katFilterOffen) { katFilterOffen = false; renderKatFilter(); }
+  });
 
   // Termin-Karte antippen -> bearbeiten (nur Bearbeiter).
   document.getElementById("hero").addEventListener("click", onCardClick);

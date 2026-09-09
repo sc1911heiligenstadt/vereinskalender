@@ -37,11 +37,14 @@ const echterCode = [
   schneideZeile("function katFarbe("),
   schneideZeile("function katName("),
   schneideZeile('const KAT_FILTER_KEY ='),
+  schneideZeile("let katFilterOffen ="),
   schneide("function ladeKatFilter("),
   schneide("function speichereKatFilter("),
   schneide("function terminPasstZumKatFilter("),
   schneide("function renderKatFilter("),
+  schneide("function schliesseKatFilterBeiKlickDaneben("),
   schneide("function onKatFilterClick("),
+  schneide("function onKatFilterChange("),
   schneide("function renderTermine("),
   schneide("function springeZuTermin(")
 ].join("\n\n");
@@ -70,6 +73,11 @@ const knoten = {};
 // querySelectorAll(".termin-card"), damit springeZuTermin echt suchen kann.
 let gezeichneteIds = [];
 
+// Die Klappliste fragt nach dem gerade fokussierten Element und sucht darin
+// weiter. Beides muss der Ersatz koennen, sonst faellt renderKatFilter() aus.
+knoten["kat-filter"].querySelector = () => null;
+knoten["kat-filter"].contains = (n) => n === knoten["kat-filter"] || !!(n && n.imFilter);
+
 const speicher = {};
 const sandbox = {
   console,
@@ -79,6 +87,7 @@ const sandbox = {
     removeItem: (k) => { delete speicher[k]; }
   },
   document: {
+    activeElement: null,
     getElementById: (id) => knoten[id] || null,
     querySelectorAll: (sel) => {
       if (sel !== ".termin-card") return { forEach: () => {} };
@@ -153,7 +162,10 @@ pruefe("die zwei Trainingstermine fehlen", !gezeichneteIds.includes("t2") && !ge
 pruefe("der Rest ist da", gezeichneteIds.length === 3, gezeichneteIds);
 pruefe("Zaehler sagt 3 von 5", knoten["termine-count"].textContent === "3 von 5 anstehenden Terminen", knoten["termine-count"].textContent);
 pruefe("'Alle zeigen' erscheint", knoten["kat-filter"].innerHTML.includes("Alle zeigen"));
-pruefe("der Knopf ist als aus gemeldet", knoten["kat-filter"].innerHTML.includes('data-kat="training" aria-pressed="false"'));
+pruefe("der Haken bei Training ist raus", knoten["kat-filter"].innerHTML.includes('data-kat="training">'), knoten["kat-filter"].innerHTML);
+pruefe("die anderen sind angehakt", knoten["kat-filter"].innerHTML.includes('data-kat="halle" checked'));
+pruefe("die Zeile ist als aus gekennzeichnet", knoten["kat-filter"].innerHTML.includes('class="kf-zeile aus"'));
+pruefe("am Knopf steht, wie viele aus sind", knoten["kat-filter"].innerHTML.includes(">1 aus<"));
 
 console.log("== 3. Termin mit geloeschter Kategorie bleibt sichtbar");
 stelleEin(["halle", "training", "veranstaltung"]);
@@ -171,9 +183,10 @@ pruefe("Leerzustand sichtbar", !knoten["termine-empty"].classList.contains("hidd
 pruefe("sagt, dass nichts eingetragen ist", knoten["termine-empty"].textContent.includes("keine anstehenden Termine eingetragen"), knoten["termine-empty"].textContent);
 pruefe("Zaehler leer", knoten["termine-count"].textContent === "");
 
-console.log("== 6. Die Zahl am Knopf zaehlt OHNE den Filter");
+console.log("== 6. Die Zahl in der Liste zaehlt OHNE den Filter");
 stelleEin(["training"]);
-pruefe("Training zeigt weiter 2", /data-kat="training"[\s\S]*?kfb-zahl">2</.test(knoten["kat-filter"].innerHTML), knoten["kat-filter"].innerHTML);
+const nachTraining = knoten["kat-filter"].innerHTML.slice(knoten["kat-filter"].innerHTML.indexOf('data-kat="training"'));
+pruefe("Training zeigt weiter 2", nachTraining.indexOf('kf-zahl">2<') > -1 && nachTraining.indexOf('kf-zahl">2<') < nachTraining.indexOf("</label>"), nachTraining.slice(0, 300));
 
 console.log("== 7. Nur eine Kategorie -> keine Leiste");
 sandbox.appData = { meta: {}, kategorien: [KATS[0]], termine: TERMINE.slice() };
@@ -182,19 +195,39 @@ sandbox.renderTermine();
 pruefe("Leiste ausgeblendet", knoten["kat-filter"].classList.contains("hidden"));
 pruefe("und leer", knoten["kat-filter"].innerHTML === "");
 
-console.log("== 8. Klick schaltet um und merkt es sich");
+console.log("== 8. Haken setzen schaltet um und merkt es sich");
 stelleEin([]);
-const machKlick = (ziel) => ({ target: { closest: (sel) => (sel === "[data-kat-alle]" ? (ziel === "alle" ? {} : null) : (ziel !== "alle" ? { dataset: { kat: ziel } } : null)) } });
-sandbox.onKatFilterClick(machKlick("halle"));
+// Ein Haken, wie ihn der Browser meldet: das <input> traegt data-kat und den
+// neuen Zustand in .checked.
+const machHaken = (kat, angehakt) => ({ target: { closest: (sel) => (sel === "input[data-kat]" ? { dataset: { kat }, checked: angehakt } : null) } });
+const machKlick = (ziel) => ({ target: { closest: (sel) => (sel === ".kat-filter-toggle" ? (ziel === "toggle" ? {} : null) : sel === "[data-kat-alle]" ? (ziel === "alle" ? {} : null) : null) }, imFilter: true });
+sandbox.onKatFilterChange(machHaken("halle", false));
 pruefe("Halle ist jetzt aus", sandbox.katAus.has("halle"));
 pruefe("im Speicher steht sie auch", JSON.parse(speicher["vk-kat-ausgeblendet"] || "[]").includes("halle"), speicher["vk-kat-ausgeblendet"]);
 pruefe("Liste ist neu gezeichnet", !gezeichneteIds.includes("t1"), gezeichneteIds);
-sandbox.onKatFilterClick(machKlick("halle"));
-pruefe("nochmal klicken schaltet zurueck", !sandbox.katAus.has("halle"));
-sandbox.onKatFilterClick(machKlick("training"));
+sandbox.onKatFilterChange(machHaken("halle", true));
+pruefe("Haken zurueck holt sie wieder", !sandbox.katAus.has("halle") && gezeichneteIds.includes("t1"));
+sandbox.onKatFilterChange(machHaken("training", false));
 sandbox.onKatFilterClick(machKlick("alle"));
 pruefe("'Alle zeigen' raeumt den Filter", sandbox.katAus.size === 0);
 pruefe("und schreibt das auch weg", JSON.parse(speicher["vk-kat-ausgeblendet"] || "[]").length === 0, speicher["vk-kat-ausgeblendet"]);
+
+console.log("== 8b. Auf- und Zuklappen");
+stelleEin([]);
+pruefe("startet zu", knoten["kat-filter"].innerHTML.includes("kat-filter-menu") && knoten["kat-filter"].innerHTML.includes(" hidden>"));
+sandbox.onKatFilterClick(machKlick("toggle"));
+pruefe("Knopf macht auf", !knoten["kat-filter"].innerHTML.includes(" hidden>") && knoten["kat-filter"].innerHTML.includes('aria-expanded="true"'));
+// ⚠️ Der Kern: ein Haken darf die Liste NICHT zuklappen -- man haekelt meist
+// mehrere hintereinander an.
+sandbox.onKatFilterChange(machHaken("training", false));
+pruefe("ein Haken laesst sie offen", !knoten["kat-filter"].innerHTML.includes(" hidden>"), knoten["kat-filter"].innerHTML.slice(0, 200));
+sandbox.schliesseKatFilterBeiKlickDaneben({ target: { irgendwo: true } });
+pruefe("Klick daneben macht zu", knoten["kat-filter"].innerHTML.includes(" hidden>"));
+sandbox.onKatFilterClick(machKlick("toggle"));
+sandbox.schliesseKatFilterBeiKlickDaneben({ target: { imFilter: true } });
+pruefe("Klick IN der Liste macht nicht zu", !knoten["kat-filter"].innerHTML.includes(" hidden>"));
+sandbox.onKatFilterClick(machKlick("toggle"));
+pruefe("Knopf macht wieder zu", knoten["kat-filter"].innerHTML.includes(" hidden>"));
 
 console.log("== 9. Gemerkter Filter wird beim Start gelesen");
 speicher["vk-kat-ausgeblendet"] = JSON.stringify(["veranstaltung"]);

@@ -27,7 +27,7 @@ const APP_FUNKTIONEN = [
       "Der nächste Termin steht oben als hervorgehobene Karte, die weiteren folgen darunter nach Monat gruppiert.",
       "Vergangene Termine verschwinden von selbst aus der Ansicht, samt der zu ihnen hochgeladenen Dateien.",
       "Jede Karte nennt, von wem und wann der Termin angelegt wurde.",
-      "Über der Liste steht je Kategorie ein Knopf. Ein Druck darauf blendet diese Kategorie aus, ein zweiter holt sie zurück; die Zahl am Knopf sagt, wie viele Termine dahinter stecken. Die Auswahl bleibt im eigenen Browser gespeichert und gilt nur für einen selbst."
+      "Neben der Überschrift steht der Knopf „Kategorien“. Er klappt eine Liste mit einem Haken je Kategorie auf; Haken raus heißt, diese Kategorie verschwindet aus der Liste. Die Zahl daneben nennt die Termine dahinter. Die Auswahl bleibt im eigenen Browser gespeichert und gilt nur für einen selbst."
     ]
   },
   {
@@ -127,9 +127,10 @@ const APP_CHANGELOG = [
       {
         title: "Termine nach Kategorie filtern",
         items: [
-          "Über der Terminliste steht jetzt je Kategorie ein Knopf — „Halle gesperrt“, „Training“, „Veranstaltung“ und so weiter. Ein Druck darauf blendet diese Kategorie aus, ein zweiter holt sie zurück.",
-          "Die Zahl am Knopf sagt, wie viele anstehende Termine dahinter stecken. Sie ändert sich nicht mit, wenn du filterst — du siehst also immer, was du gerade ausblendest.",
-          "Ist etwas ausgeblendet, erscheint daneben „Alle zeigen“ und die Zeile über der Liste sagt „3 von 11 anstehenden Terminen“.",
+          "Neben der Überschrift „Anstehende Termine“ steht jetzt der Knopf „Kategorien“. Ein Druck klappt eine Liste auf: je Kategorie ein Haken. Haken raus heißt, diese Kategorie verschwindet aus der Liste.",
+          "Die Zahl neben jeder Kategorie sagt, wie viele anstehende Termine dahinter stecken. Sie ändert sich nicht mit, wenn du filterst — du siehst also immer, was du gerade ausblendest.",
+          "Am Knopf selbst steht, wie viele Kategorien gerade aus sind. Unten in der Liste steht „Alle zeigen“, und die Zeile über der Terminliste sagt „3 von 11 anstehenden Terminen“.",
+          "Die Liste bleibt beim Anhaken offen — man wählt meist mehrere hintereinander. Zu geht sie mit einem Klick daneben, mit Escape oder mit dem Knopf.",
           "Die Auswahl bleibt in deinem Browser gespeichert und gilt nur für dich. Am Kalender selbst ändert sie nichts.",
           "Führt ein Link auf einen Termin, den dein Filter gerade ausblendet, wird die Kategorie automatisch wieder eingeschaltet — und es steht dabei, dass das passiert ist."
         ]

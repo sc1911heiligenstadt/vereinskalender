@@ -205,50 +205,94 @@ body.can-edit .termin-card:hover { background: var(--blue-light); }
 .tc-notiz { font-size: 13px; color: var(--text); margin-top: 6px; white-space: pre-wrap; }
 .tc-meta { font-size: 14px; color: var(--muted); margin-top: 10px; }
 
-/* ---------- Kategorie-Filter ueber der Terminliste (seit 09.09.2026) ---------- */
-/* Die Knoepfe sehen aus wie die Kategorie-Marken auf den Karten, damit klar ist,
-   worauf sie sich beziehen. Ausgeschaltet heisst: blass und durchgestrichen --
-   Farbe allein reichte nicht, wer Rot und Gruen schlecht unterscheidet saehe
-   sonst keinen Unterschied zwischen an und aus. */
-.kat-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 14px;
-}
-.kat-filter-btn {
+/* ---------- Kategorie-Filter neben der Ueberschrift (seit 09.09.2026) ---------- */
+/* Eine Klappliste, keine Reihe Knoepfe (Michel-Vorgabe): bei fuenf Kategorien nahm
+   die Reihe zwei volle Zeilen ueber der Terminliste ein. Der Knopf steht neben der
+   Ueberschrift und sagt selbst, wie viele Kategorien gerade aus sind. */
+.titel-zeile { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.kat-filter { position: relative; }
+.kat-filter-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   color: var(--muted);
   cursor: pointer;
-  /* 44px fuer den Daumen: die Leiste steht am Handy ueber der Liste und wird
-     dort angetippt, nicht angeklickt. Dasselbe Mass, das die Abnahme vom
-     07.09.2026 fuer den Kalender-Knopf an der Terminkarte verlangt hat. */
+  /* 44px fuer den Daumen -- dasselbe Mass, das die Abnahme vom 07.09.2026 fuer
+     den Kalender-Knopf an der Terminkarte verlangt hat. */
   min-height: 44px;
 }
-.kat-filter-btn.an { color: var(--text); border-color: var(--blue); background: var(--blue-light); }
-.kat-filter-btn:not(.an) { opacity: 0.55; }
-.kat-filter-btn:not(.an) .kfb-name { text-decoration: line-through; }
-.kat-filter-btn:not(.an) .kat-dot { background: var(--muted) !important; }
-.kfb-zahl { font-size: 11px; font-weight: 700; color: var(--muted); }
-.kat-filter-alle {
-  background: none;
-  border: none;
-  padding: 6px 4px;
+.kat-filter-toggle.aktiv { color: var(--text); border-color: var(--blue); background: var(--blue-light); }
+.kat-filter-toggle[aria-expanded="true"] .kf-pfeil { transform: rotate(180deg); }
+.kf-pfeil { font-size: 11px; line-height: 1; }
+.kf-marke {
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+/* ⚠️ Die Liste schwebt (absolute), damit sie die Termine darunter nicht
+   wegschiebt. z-index, weil die Terminkarten eigene Schatten und Positionen
+   haben und sonst darueber liegen. */
+.kat-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 32px));
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 6px;
+}
+.kf-zeile {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  min-height: 44px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--blue);
-  text-decoration: underline;
+  color: var(--text);
   cursor: pointer;
-  min-height: 44px;
 }
+.kf-zeile:hover { background: var(--blue-light); }
+.kf-zeile input { width: 17px; height: 17px; flex-shrink: 0; cursor: pointer; }
+/* Aus ist blass UND durchgestrichen: Farbe allein reicht nicht, wer Rot und Gruen
+   schlecht unterscheidet saehe sonst keinen Unterschied zwischen an und aus. */
+.kf-zeile.aus { color: var(--muted); }
+.kf-zeile.aus .kf-name { text-decoration: line-through; }
+.kf-zeile.aus .kat-dot { background: var(--muted) !important; }
+.kf-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.kf-zahl { font-size: 11px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+.kf-alle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 0 8px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--blue);
+  text-align: left;
+  cursor: pointer;
+}
+.kf-alle:hover { background: var(--blue-light); }
 
 .kat-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
 .kat-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
